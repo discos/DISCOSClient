@@ -2,8 +2,7 @@
 from discos_client import DISCOSClient
 
 def main():
-    #SRT = DISCOSClient(address='127.0.0.1', port='16001')
-    SRT = DISCOSClient(address='192.168.10.200', port='16000')
+    SRT = DISCOSClient(address='127.0.0.1')
     while True:
         antenna = SRT.get("antenna", wait=True)
         print(

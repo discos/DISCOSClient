@@ -3,7 +3,7 @@ import asyncio
 from discos_client import DISCOSClient
 
 async def main():
-    SRT = DISCOSClient(address='192.168.10.200', port='16000', asyncronous=True)
+    SRT = DISCOSClient(address='127.0.0.1', asynchronous=True)
     while True:
         antenna = await SRT.get("antenna", wait=True)
         print(
