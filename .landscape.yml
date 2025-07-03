@@ -1,0 +1,9 @@
+strictness: veryhigh
+
+test-warnings: true
+
+autodetect: false
+
+ignore-paths:
+  - build
+  - examples

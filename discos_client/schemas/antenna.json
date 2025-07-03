@@ -1,0 +1,287 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "antenna",
+  "type": "object",
+  "description": "Status of the antenna boss.",
+  "properties": {
+    "FWHM": {
+      "type": "number",
+      "title": "Full Width at Half Maximum",
+      "description": "Full width at half maximum of the antenna beam.",
+      "unit": "degrees"
+    },
+    "azimuthOffset": {
+      "type": "number",
+      "title": "Azimuth offset",
+      "description": "Offset applied to the azimuth angle.",
+      "unit": "degrees"
+    },
+    "correctionEnabled": {
+      "type": "boolean",
+      "title": "Pointing corrections",
+      "description": "Indicates whether automatic pointing correction is enabled."
+    },
+    "declinationOffset": {
+      "type": "number",
+      "title": "Declination offset",
+      "description": "Offset applied to the declination angle.",
+      "unit": "degrees"
+    },
+    "elevationOffset": {
+      "type": "number",
+      "title": "Elevation offset",
+      "description": "Offset applied to the elevation angle.",
+      "unit": "degrees"
+    },
+    "generatorType": {
+      "type": "string",
+      "title": "Generator type",
+      "description": "Type of pointing generator used for tracking.",
+      "enum": [
+        "SIDEREAL",
+        "SUN",
+        "MOON",
+        "SATELLITE",
+        "SOLARSYSTEMBODY",
+        "OTF",
+        "NONE"
+      ]
+    },
+    "latitudeOffset": {
+      "type": "number",
+      "title": "Galactic latitude offset",
+      "description": "Offset applied to the galactic latitude.",
+      "unit": "degrees"
+    },
+    "longitudeOffset": {
+      "type": "number",
+      "title": "Galactic longitude offset",
+      "description": "Offset applied to the galactic longitude.",
+      "unit": "degrees"
+    },
+    "observedAzimuth": {
+      "type": "number",
+      "title": "Observed azimuth",
+      "description": "Observed azimuth angle of the antenna.",
+      "unit": "degrees"
+    },
+    "observedDeclination": {
+      "type": "number",
+      "title": "Observed declination",
+      "description": "Observed declination angle of the antenna.",
+      "unit": "degrees"
+    },
+    "observedElevation": {
+      "type": "number",
+      "title": "Observed elevation",
+      "description": "Observed elevation angle of the antenna.",
+      "unit": "degrees"
+    },
+    "observedGalLatitude": {
+      "type": "number",
+      "title": "Observed galactic latitude",
+      "description": "Observed galactic latitude of the antenna pointing.",
+      "unit": "degrees"
+    },
+    "observedGalLongitude": {
+      "type": "number",
+      "title": "Observed galactic longitude",
+      "description": "Observed galactic longitude of the antenna pointing.",
+      "unit": "degrees"
+    },
+    "observedRightAscension": {
+      "type": "number",
+      "title": "Observed right ascension",
+      "description": "Observed right ascension of the antenna pointing.",
+      "unit": "degrees"
+    },
+    "pointingAzimuthCorrection": {
+      "type": "number",
+      "title": "Azimuth pointing correction",
+      "description": "Computed correction for azimuth pointing.",
+      "unit": "degrees"
+    },
+    "pointingElevationCorrection": {
+      "type": "number",
+      "title": "Elevation pointing correction",
+      "description": "Computed correction for elevation pointing.",
+      "unit": "degrees"
+    },
+    "rawAzimuth": {
+      "type": "number",
+      "title": "Raw azimuth",
+      "description": "Raw azimuth reading from the encoder.",
+      "unit": "degrees"
+    },
+    "rawElevation": {
+      "type": "number",
+      "title": "Raw elevation",
+      "description": "Raw elevation reading from the encoder.",
+      "unit": "degrees"
+    },
+    "refractionCorrection": {
+      "type": "number",
+      "title": "Refraction pointing correction",
+      "description": "Atmospheric refraction correction applied to elevation.",
+      "unit": "degrees"
+    },
+    "rightAscensionOffset": {
+      "type": "number",
+      "title": "Right ascension offset",
+      "description": "Offset applied to right ascension.",
+      "unit": "degrees"
+    },
+    "status": {
+      "type": "string",
+      "title": "System status",
+      "description": "Operational status of the antenna system.",
+      "enum": [
+        "OK",
+        "WARNING",
+        "FAILURE"
+      ]
+    },
+    "target": {
+      "type": "string",
+      "title": "Target ID",
+      "description": "Identifier or name of the current observed target."
+    },
+    "targetDeclination": {
+      "type": "number",
+      "title": "Target declination",
+      "description": "Declination coordinate of the observed target.",
+      "unit": "degrees"
+    },
+    "targetFlux": {
+      "type": "number",
+      "title": "Target flux",
+      "description": "Flux density of the target.",
+      "unit": "Jansky"
+    },
+    "targetRightAscension": {
+      "type": "number",
+      "title": "Target right ascension",
+      "description": "Right ascension coordinate of the observed target.",
+      "unit": "degrees"
+    },
+    "targetVrad": {
+      "type": "number",
+      "title": "Target radial velocity",
+      "description": "Radial velocity of the target.",
+      "unit": "km/s"
+    },
+    "timestamp": {
+      "type": "object",
+      "title": "Timestamps",
+      "description": "Collection of timestamp representations for the data sample.",
+      "properties": {
+        "omg": {
+          "type": "integer",
+          "title": "Object Management Group Time",
+          "description": "Elapsed time since the OMG epoch (1582-10-15T00:00:00.000Z).",
+          "unit": "100ns"
+        },
+        "iso8601": {
+          "type": "string",
+          "title": "ISO 8601",
+          "description": "Full ISO 8601 timestamp.",
+          "format": "date-time"
+        },
+        "jd": {
+          "type": "number",
+          "title": "Julian Date",
+          "description": "Continuous Julian Date.",
+          "unit": "days"
+        },
+        "mjd": {
+          "type": "number",
+          "title": "Modified Julian Date",
+          "description": "Modified Julian Date.",
+          "unit": "days"
+        },
+        "unix_time": {
+          "type": "number",
+          "title": "UNIX Time",
+          "description": "Elapsed time measured in seconds since the UNIX epoch at 1970-01-01T00:00:00 UTC.",
+          "unit": "seconds"
+        }
+      },
+      "required": [
+        "omg",
+        "iso8601",
+        "jd",
+        "mjd",
+        "unix_time"
+      ]
+    },
+    "tracking": {
+      "type": "boolean",
+      "title": "Tracking flag",
+      "description": "Indicates whether the antenna is tracking the given coordinates."
+    },
+    "vradDefinition": {
+      "type": "string",
+      "title": "Target radial velocity definition",
+      "description": "Radial velocity definition of the target.",
+      "enum": [
+        "RADIO",
+        "OPTICAL",
+        "REDSHIFT",
+        "UNDEFINED"
+      ]
+    },
+    "vradReferenceFrame": {
+      "type": "string",
+      "title": "Target radial velocity reference frame",
+      "description": "Reference frame used for the target radial velocity measurements.",
+      "enum": [
+        "TOPOCENTRIC",
+        "BARYCENTRIC",
+        "KINEMATICLOCALSTANDARDOFREST",
+        "DYNAMICLOCALSTANDARDOFREST",
+        "GALACTICCENTER",
+        "LOCALGROUP",
+        "UNDEFINED"
+      ]
+    },
+    "waveLength": {
+      "type": "number",
+      "title": "Observation wavelength",
+      "description": "Currently used wavelength.",
+      "unit": "meters"
+    }
+  },
+  "required": [
+    "FWHM",
+    "azimuthOffset",
+    "correctionEnabled",
+    "declinationOffset",
+    "elevationOffset",
+    "generatorType",
+    "latitudeOffset",
+    "longitudeOffset",
+    "observedAzimuth",
+    "observedDeclination",
+    "observedElevation",
+    "observedGalLatitude",
+    "observedGalLongitude",
+    "observedRightAscension",
+    "pointingAzimuthCorrection",
+    "pointingElevationCorrection",
+    "rawAzimuth",
+    "rawElevation",
+    "refractionCorrection",
+    "rightAscensionOffset",
+    "status",
+    "target",
+    "targetDeclination",
+    "targetFlux",
+    "targetRightAscension",
+    "targetVrad",
+    "timestamp",
+    "vradDefinition",
+    "vradReferenceFrame",
+    "waveLength"
+  ]
+}
+

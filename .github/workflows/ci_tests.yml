@@ -1,0 +1,43 @@
+name: CI Tests
+
+on:
+  - push
+  - pull_request
+  - workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9.4', '3']
+
+    steps:
+    - name: Install the zmq library
+      run: |
+        sudo apt update
+        sudo apt install libzmq3-dev
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        check-latest: true
+    - name: Install dependencies
+      run: |
+        python -m pip install -r requirements.txt
+        python -m pip install -r testing_requirements.txt
+    - name: Run the unit tests
+      run: |
+        coverage run -p -m unittest discover -b tests
+        coverage combine
+        coverage report
+    #    coverage xml
+    #- name: Upload coverage reports to Codecov
+    #  uses: codecov/codecov-action@v4.0.1
+    #  with:
+    #    token: ${{ secrets.CODECOV_TOKEN }}
+    #    slug: discos/DISCOSClient
+    - name: Run the Python linter
+      run: |
+        prospector

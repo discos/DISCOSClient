@@ -1,0 +1,477 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "mount",
+  "type": "object",
+  "description": "Status of the antenna mount.",
+  "$defs": {
+    "axis_status": {
+      "type": "object",
+      "properties": {
+        "currentPosition": {
+          "type": "number",
+          "title": "Current position",
+          "description": "Current axis position.",
+          "unit": "degrees"
+        },
+        "currentRate": {
+          "type": "number",
+          "title": "Current rate",
+          "description": "Current axis rate.",
+          "unit": "degress/s"
+        },
+        "currentOffset": {
+          "type": "number",
+          "title": "Current offset",
+          "description": "Current axis position offset.",
+          "unit": "degrees"
+        },
+        "currentPositionError": {
+          "type": "number",
+          "title": "Current position error",
+          "description": "Current axis position error.",
+          "unit": "degrees"
+        },
+        "currentTrackingError": {
+          "type": "number",
+          "title": "Current tracking error",
+          "description": "Current axis tracking error.",
+          "unit": "degrees"
+        },
+        "currentMode": {
+          "type": "string",
+          "title": "Current operating mode.",
+          "description": "Current axis operating mode.",
+          "enum": [
+            "STANDBY",
+            "STOP",
+            "PRESET",
+            "PROGRAMTRACK",
+            "RATE",
+            "STOW",
+            "UNSTOW",
+            "UNKNOWN"
+          ]
+        },
+        "commandedPosition": {
+          "type": "number",
+          "title": "Commanded position",
+          "description": "Current axis commanded position.",
+          "unit": "degrees"
+        },
+        "commandedRate": {
+          "type": "number",
+          "title": "Commanded rate.",
+          "description": "Current axis commanded rate.",
+          "unit": "degrees/s"
+        },
+        "commandedOffset": {
+          "type": "number",
+          "title": "Commanded offset.",
+          "description": "Current axis commanded offset.",
+          "unit": "degrees"
+        },
+        "ready": {
+          "type": "boolean",
+          "title": "Ready.",
+          "description": "Indicates if the axis is ready."
+        },
+        "active": {
+          "type": "boolean",
+          "title": "Active",
+          "description": "Indicates if the axis is active."
+        },
+        "lowPowerMode": {
+          "type": "boolean",
+          "title": "Low power mode.",
+          "description": "Indicates if the axis low power mode is enabled."
+        },
+        "stowed": {
+          "type": "boolean",
+          "title": "Axis stowed",
+          "description": "Indicates if the axis is stowed."
+        },
+        "stowPinExtracted": {
+          "type": "boolean",
+          "title": "Axis stow pin extracted",
+          "description": "Indicates if the axis stow pin is extracted."
+        },
+        "preLimitUp": {
+          "type": "boolean",
+          "title": "Pre-limit up",
+          "description": "Indicates if the axis upper pre-limit has been reached."
+        },
+        "preLimitDown": {
+          "type": "boolean",
+          "title": "Pre-limit down",
+          "description": "Indicates if the axis lower pre-limit has been reached."
+        },
+        "finalLimitUp": {
+          "type": "boolean",
+          "title": "Final-limit up",
+          "description": "Indicates if the axis upper final-limit has been reached."
+        },
+        "finalLimitDown": {
+          "type": "boolean",
+          "title": "Final-limit down",
+          "description": "Indicates if the axis lower final-limit has been reached."
+        },
+        "rateLimit": {
+          "type": "boolean",
+          "title": "Rate limit",
+          "description": "Indicates if the axis rate limit has been reached."
+        },
+        "encoderFailure": {
+          "type": "boolean",
+          "title": "Encoder failure",
+          "description": "Indicates if there has been an axis encoder failure."
+        },
+        "brakeError": {
+          "type": "boolean",
+          "title": "Brake error",
+          "description": "Indicates if there has been an axis brake error."
+        },
+        "servoError": {
+          "type": "boolean",
+          "title": "Servo error",
+          "description": "Indicates if there has been an axis servo error."
+        },
+        "motors": {
+          "type": "array",
+          "title": "Motors",
+          "description": "List of motor statuses.",
+          "items": {
+            "$ref": "#/$defs/motor"
+          }
+        }
+      },
+      "required": [
+        "currentPosition",
+        "currentRate",
+        "currentOffset",
+        "currentPositionError",
+        "currentTrackingError",
+        "currentMode",
+        "commandedPosition",
+        "commandedRate",
+        "commandedOffset",
+        "ready",
+        "active",
+        "lowPowerMode",
+        "stowed",
+        "stowPinExtracted",
+        "preLimitUp",
+        "preLimitDown",
+        "finalLimitUp",
+        "finalLimitDown",
+        "rateLimit",
+        "encoderFailure",
+        "brakeError",
+        "servoError",
+        "motors"
+      ]
+    },
+    "motor": {
+      "type": "object",
+      "title": "Motor status",
+      "description": "Status of an axis motor.",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "title": "Motor ID",
+          "description": "Motor ID number."
+        },
+        "position": {
+          "type": "number",
+          "title": "Position",
+          "description": "Current motor position.",
+          "unit": "degrees"
+        },
+        "rpm": {
+          "type": "number",
+          "title": "Revolutions Per Minute",
+          "description": "Current motor revolutions per minute.",
+          "unit": "rpm"
+        },
+        "torque": {
+          "type": "number",
+          "title": "Torque",
+          "description": "Current motor torque.",
+          "unit": "N/m"
+        },
+        "usage": {
+          "type": "number",
+          "title": "Usage",
+          "description": "Current motor utilization percentage.",
+          "unit": "%"
+        },
+        "enabled": {
+          "type": "boolean",
+          "title": "Enabled",
+          "description": "Indicates if the motor is enabled."
+        },
+        "brakesOpen": {
+          "type": "boolean",
+          "title": "Brakes open",
+          "description": "Indicates if the motor brakes are open."
+        },
+        "powerModuleOk": {
+          "type": "boolean",
+          "title": "Power status",
+          "description": "Indicates if the motor has power."
+        },
+        "active": {
+          "type": "boolean",
+          "title": "Active",
+          "description": "Indicates if the motor is active."
+        },
+        "servoError": {
+          "type": "boolean",
+          "title": "Servo error",
+          "description": "Indicates if the motor servo has an error."
+        },
+        "sensorError": {
+          "type": "boolean",
+          "title": "Sensor error",
+          "description": "Indicates if the motor sensor has an error."
+        },
+        "busError": {
+          "type": "boolean",
+          "title": "BUS error",
+          "description": "Indicates if the motor BUS has an error."
+        }
+      },
+      "required": [
+        "id",
+        "position",
+        "rpm",
+        "torque",
+        "usage",
+        "enabled",
+        "brakesOpen",
+        "powerModuleOk",
+        "active",
+        "servoError",
+        "sensorError",
+        "busError"
+      ]
+    }
+  },
+  "properties": {
+    "messageSyncError": {
+      "type": "boolean",
+      "title": "Message synchronization error",
+      "description": "Error in message synchronization."
+    },
+    "statusLineError": {
+      "type": "boolean",
+      "title": "Status communication line error",
+      "description": "Error in status communication line."
+    },
+    "controlLineError": {
+      "type": "boolean",
+      "title": "Control communication line error",
+      "description": "Error in control communication line."
+    },
+    "remoteDisabled": {
+      "type": "boolean",
+      "title": "Remote control disabled",
+      "description": "Remote control disabled."
+    },
+    "emergencyStop": {
+      "type": "boolean",
+      "title": "Emergency stop",
+      "description": "Mount stopped due to an emergency status."
+    },
+    "mainPowerError": {
+      "type": "boolean",
+      "title": "Main power error",
+      "description": "Main power error."
+    },
+    "timeError": {
+      "type": "boolean",
+      "title": "Time error",
+      "description": "Time error."
+    },
+    "timeOffset": {
+      "type": "number",
+      "title": "Time offset",
+      "description": "ACU time offset in fraction of day.",
+      "unit": "days"
+    },
+    "programTrackError": {
+      "type": "boolean",
+      "title": "Program track error",
+      "description": "ProgramTrack error."
+    },
+    "remoteCommandError": {
+      "type": "boolean",
+      "title": "Remote command error",
+      "description": "Remote command error."
+    },
+    "controlSocketConnected": {
+      "type": "boolean",
+      "title": "Control socket status",
+      "description": "Control socket status."
+    },
+    "statusSocketConnected": {
+      "type": "boolean",
+      "title": "Status socket status",
+      "description": "Status socket status."
+    },
+    "status": {
+      "type": "string",
+      "title": "Mount component status",
+      "description": "Overall status of the mount system.",
+      "enum": [
+        "OK",
+        "WARNING",
+        "FAILURE"
+      ]
+    },
+    "remainingTrackingPoints": {
+      "type": "integer",
+      "title": "Remaining tracking points",
+      "description": "Number of remaining points in the tracking trajectory."
+    },
+    "sector": {
+      "type": "string",
+      "title": "Azimuth sector",
+      "description": "Current azimuth travel sector.",
+      "enum": [
+        "CW",
+        "CCW"
+      ]
+    },
+    "azimuth": {
+      "title": "Azimuth axis status",
+      "description": "Azimuth axis status of the antenna mount.",
+      "allOf": [
+        { "$ref": "#/$defs/axis_status" }
+      ]
+    },
+    "elevation": {
+      "title": "Elevation axis status",
+      "description": "Elevation axis status of the antenna mount.",
+      "allOf": [
+        { "$ref": "#/$defs/axis_status" }
+      ]
+    },
+    "cableWrap": {
+      "type": "object",
+      "title": "Cable wrap axis status.",
+      "description": "Cable wrap axis status of the antenna mount.",
+      "properties": {
+        "currentPosition": {
+          "type": "number",
+          "title": "Current position",
+          "description": "Current axis position.",
+          "unit": "degrees"
+        },
+        "currentRate": {
+          "type": "number",
+          "title": "Current rate",
+          "description": "Current axis rate.",
+          "unit": "degress/s"
+        },
+        "currentTrackingError": {
+          "type": "number",
+          "title": "Current tracking error",
+          "description": "Current axis tracking error.",
+          "unit": "degrees"
+        },
+        "motors": {
+          "type": "array",
+          "title": "Motors",
+          "description": "List of motor statuses.",
+          "items": {
+            "$ref": "#/$defs/motor"
+          }
+        }
+      }
+    },
+    "pointing": {
+      "type": "object",
+      "title": "Pointing status",
+      "description": "Pointing status of the antenna mount.",
+      "properties": {
+        "azimuthEncoderPosition": {
+          "type": "number",
+          "title": "Azimuth encoder position",
+          "description": "Current position of the azimuth encoder.",
+          "unit": "degrees"
+        },
+        "elevationEncoderPosition": {
+          "type": "number",
+          "title": "Elevation encoder position",
+          "description": "Current position of the elevation encoder.",
+          "unit": "degrees"
+        }
+      }
+    },
+    "timestamp": {
+      "type": "object",
+      "title": "Timestamps",
+      "description": "Collection of timestamp representations for the data sample.",
+      "properties": {
+        "omg": {
+          "type": "integer",
+          "title": "Object Management Group Time",
+          "description": "Elapsed time since the OMG epoch (1582-10-15T00:00:00.000Z).",
+          "unit": "100ns"
+        },
+        "iso8601": {
+          "type": "string",
+          "title": "ISO 8601",
+          "description": "Full ISO 8601 timestamp.",
+          "format": "date-time"
+        },
+        "jd": {
+          "type": "number",
+          "title": "Julian Date",
+          "description": "Continuous Julian Date.",
+          "unit": "days"
+        },
+        "mjd": {
+          "type": "number",
+          "title": "Modified Julian Date",
+          "description": "Modified Julian Date.",
+          "unit": "days"
+        },
+        "unix_time": {
+          "type": "number",
+          "title": "UNIX Time",
+          "description": "Elapsed time measured in seconds since the UNIX epoch at 1970-01-01T00:00:00 UTC.",
+          "unit": "seconds"
+        }
+      },
+      "required": [
+        "omg",
+        "iso8601",
+        "jd",
+        "mjd",
+        "unix_time"
+      ]
+    }
+  },
+  "required": [
+    "azimuth",
+    "sector",
+    "cableWrap",
+    "status",
+    "controlLineError",
+    "controlSocketConnected",
+    "elevation",
+    "emergencyStop",
+    "mainPowerError",
+    "messageSyncError",
+    "programTrackError",
+    "remainingTrackingPoints",
+    "remoteCommandError",
+    "remoteControlDisabled",
+    "statusLineError",
+    "statusSocketConnected",
+    "timeError",
+    "timeOffset",
+    "timestamp"
+  ]
+}
