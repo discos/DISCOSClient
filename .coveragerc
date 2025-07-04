@@ -1,2 +1,11 @@
 [run]
 source = discos_client
+
+[paths]
+discos_client =
+    discos_client
+    */DISCOSClient/discos_client
+    */DISCOSClient/DISCOSClient/discos_client
+    */work/DISCOSClient/DISCOSClient/discos_client
+    */runner/work/DISCOSClient/DISCOSClient/discos_client
+    */a/DISCOSClient/DISCOSClient/discos_client
