@@ -37,6 +37,7 @@ jobs:
         echo "Current working directory: $(pwd)"
         echo "Contents:"
         find . -name ".coverage*" -ls || echo "No coverage files found"
+      shell: bash
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
       with:
