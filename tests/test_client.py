@@ -35,7 +35,7 @@ class TestPublisher:
         poller = zmq.Poller()
         poller.register(self.socket, zmq.POLLIN)
         while not self.event.is_set():
-            events = dict(poller.poll(10))
+            events = dict(poller.poll(100))
             if self.socket in events:
                 event = self.socket.recv()
                 if event[0] == 1:
@@ -145,7 +145,7 @@ class TestSyncClient(unittest.TestCase):
         pub = TestPublisher()
         time.sleep(1)
         client = DISCOSClient("antenna", address="127.0.0.1")
-        antenna = client.get("antenna", wait=True)
+        antenna = client.get("antenna.timestamp", wait=True)
         self.assertIsInstance(antenna, DISCOSNamespace)
         antenna = client.get("antenna")
         self.assertIsInstance(antenna, DISCOSNamespace)
@@ -174,7 +174,7 @@ class TestAsyncClient(unittest.IsolatedAsyncioTestCase):
             address="127.0.0.1",
             asynchronous=True
         )
-        antenna = await client.get("antenna", wait=True)
+        antenna = await client.get("antenna.timestamp", wait=True)
         self.assertIsInstance(antenna, DISCOSNamespace)
         antenna = await client.get("antenna")
         self.assertIsInstance(antenna, DISCOSNamespace)

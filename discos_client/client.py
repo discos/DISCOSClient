@@ -5,6 +5,7 @@ import asyncio
 from random import SystemRandom
 from collections import defaultdict
 from copy import deepcopy
+from typing import Any
 import zmq
 from .namespace import DISCOSNamespace
 from .utils import load_schemas, merge_schema
@@ -12,7 +13,7 @@ from .utils import load_schemas, merge_schema
 DEFAULT_PORT = 16000
 
 
-class FactoryClient:  # noqa
+class DISCOSClient:  # noqa
     """
     Factory class that returns a DISCOS client instance.
 
@@ -42,7 +43,7 @@ class FactoryClient:  # noqa
         return client_class(*topics, address=address, port=port)
 
 
-class DISCOSClient:
+class BaseClient:
     """
     Class that implements a base DISCOSClient class for SyncClient and
     AsyncClient.
@@ -60,7 +61,8 @@ class DISCOSClient:
         port: int,
     ) -> None:
         """
-        Initialize the class instance.
+        Initializes the class instance. Loads the JSON schemas and opens the
+        ZMQ socket connection.
 
         :param topics: The topic names to subscribe to.
         :param address: The IP address to subscribe to.
@@ -92,13 +94,16 @@ class DISCOSClient:
         self.__initialize__()
 
     def __del__(self):
+        """
+        Closes the ZMQ socket and context.
+        """
         self._socket.close()
         self._context.term()
 
     def __initialize__(self) -> None:
         """
-        Initialize the client by retrieving JSON schemas
-        and initial messages.
+        Initializes the client inner DISCOSNamespaces by retrieving initial
+        messages.
         """
         rand_id = str(SystemRandom().randint(0, 100)).zfill(3)
         self._socket.setsockopt(zmq.RCVTIMEO, 10)
@@ -145,7 +150,7 @@ class DISCOSClient:
         """
         Merges a schema and a message into a DISCOSNamespace.
 
-        :param message: The received JSON message, containing kay-value pairs.
+        :param message: The received JSON message, containing key-value pairs.
         :param schemas: The schemas dictionary.
         :param rand_id: Random identifier. Used to remove the said ID from the
                         topic name. After initialization will always be None.
@@ -181,10 +186,10 @@ class DISCOSClient:
         Custom format method.
 
         :param spec: The format specifier. It can be:
-                     - 'c' for compact JSON representation
-                     - 'i' for multi-line, indented JSON representation.
-                       'i' can be preceeded by a number, which will be the
-                       desired indentation. Default is 2.
+                     'c' for compact JSON representation
+                     'i' for multi-line, indented JSON representation.
+                     'i' can be preceeded by a number, which will be the
+                     desired indentation. Default is 2.
         :return: A JSON formatted string.
         """
         if not spec:
@@ -236,8 +241,22 @@ class DISCOSClient:
             lambda item: item[0] in self._topics, self.__dict__.items()
         ))
 
+    @staticmethod
+    def __enumerate_paths__(topic, payload):
+        """
+        Yields all nested paths inside a DISCOSNamespace
+        """
+        yield topic
+        for k, v in vars(payload).items():
+            if not DISCOSNamespace.__is__(v) or "enum" in k:
+                continue
+            full_path = f"{topic}.{k}" if topic else k
+            yield full_path
+            if isinstance(v, DISCOSNamespace):
+                yield from BaseClient.__enumerate_paths__(full_path, v)
 
-class SyncClient(DISCOSClient):
+
+class SyncClient(BaseClient):
     """
     Class that implements a synchronous DISCOSClient class.
 
@@ -252,7 +271,7 @@ class SyncClient(DISCOSClient):
         port: int,
     ) -> None:
         """
-        Initialize the DISCOSClient base and SyncClient object,
+        Initializes the DISCOSClient base and SyncClient object,
         along with its attributes. Starts the message receiving thread
         in background.
 
@@ -279,40 +298,64 @@ class SyncClient(DISCOSClient):
             topic, payload = self.__to_namespace__(message, self._schemas)
             with self.__locks[topic]:
                 self.__update_namespace__(topic, payload)
-            with self.__waiting_lock:
-                waiters = self._waiting.pop(topic, [])
-            for event, result in waiters:
-                result["value"] = payload
-                event.set()
 
-    def get(self, topic: str, wait: bool = False) -> DISCOSNamespace:
+            changed_paths = set(self.__enumerate_paths__(topic, payload))
+
+            with self.__waiting_lock:
+                to_remove = []
+                for path, waiters in self._waiting.items():
+                    if path in changed_paths:
+                        for event, result in waiters:
+                            result["value"] = self.__resolve_path__(path)
+                            event.set()
+                        to_remove.append(path)
+                for path in to_remove:
+                    del self._waiting[path]
+
+    def __resolve_path__(self, path: str) -> Any:
+        """
+        Resolves the given path into the final attribute.
+
+        :param path: the path the user is asking the namespace or value for.
+        :return: the current DISCOSNamespace or value.
+        """
+        base_topic, *subpath = path.split(".")
+        with self.__locks[base_topic]:
+            obj = self.__dict__[base_topic]
+            for key in subpath:
+                obj = getattr(obj, key)
+            return deepcopy(obj)
+
+    def get(self, path: str, wait: bool = False) -> Any:
         """
         Retrieves the DISCOSNamespace for the given topic.
 
-        :param topic: the topic the user is asking the DISCOSNamespace for.
+        :param path: the path the user is asking the namespace or value for.
         :param wait: a boolean indicating whether to wait for a new message
-                     before returning the relative DISCOSNamespace.
-        :return: the current or next received DISCOSNamespace.
+                     before returning the relative DISCOSNamespace or value.
+        :return: the current or next received DISCOSNamespace or value.
         """
-        if topic not in self._schemas.keys():
-            raise KeyError(f"Unknown topic '{topic}'")
-        if topic not in self._topics:
-            raise KeyError(f"The client is not subscribed to '{topic}'")
-        value = None
+        base_topic = path.split(".")[0]
+        if base_topic not in self._schemas:
+            raise KeyError(f"Unknown topic '{base_topic}'")
+        if base_topic not in self._topics:
+            raise KeyError(f"The client is not subscribed to '{base_topic}'")
         if wait:
             event = threading.Event()
             result = {}
             with self.__waiting_lock:
-                self._waiting.setdefault(topic, []).append((event, result))
+                self._waiting.setdefault(path, []).append((event, result))
             event.wait()
-            value = result["value"]
-        else:
-            with self.__locks[topic]:
-                value = self.__dict__[topic]
-        return deepcopy(value)
+            return deepcopy(result["value"])
+        return deepcopy(self.__resolve_path__(path))
 
 
-class AsyncClient(DISCOSClient):
+class AsyncClient(BaseClient):
+    """
+    Class that implements a asynchronous DISCOSClient class.
+
+    It contains the attributes necessary for the client to work with asyncio.
+    """
 
     def __init__(
         self,
@@ -349,36 +392,60 @@ class AsyncClient(DISCOSClient):
                 topic, payload = self.__to_namespace__(message, self._schemas)
                 async with self.__locks[topic]:
                     self.__update_namespace__(topic, payload)
+
+                changed_paths = set(
+                    self.__enumerate_paths__(topic, payload)
+                )
+
                 async with self.__waiting_lock:
-                    waiters = self._waiting.pop(topic, [])
-                for event, result in waiters:
-                    result["value"] = payload
-                    event.set()
+                    to_remove = []
+                    for path, waiters in self._waiting.items():
+                        if path in changed_paths:
+                            for event, result in waiters:
+                                result["value"] = await self.__resolve_path__(
+                                    path
+                                )
+                                event.set()
+                            to_remove.append(path)
+                    for path in to_remove:
+                        del self._waiting[path]
         except (asyncio.CancelledError, KeyboardInterrupt):
             pass
 
-    async def get(self, topic: str, wait: bool = False) -> DISCOSNamespace:
+    async def __resolve_path__(self, path: str) -> Any:
+        """
+        Resolves the given path into the final attribute.
+
+        :param path: the path the user is asking the namespace or value for.
+        :return: the current DISCOSNamespace or value.
+        """
+        base_topic, *subpath = path.split(".")
+        async with self.__locks[base_topic]:
+            obj = self.__dict__[base_topic]
+            for key in subpath:
+                obj = getattr(obj, key)
+            return deepcopy(obj)
+
+    async def get(self, path: str, wait: bool = False) -> DISCOSNamespace:
         """
         Retrieves the DISCOSNamespace for the given topic.
 
-        :param topic: the topic the user is asking the DISCOSNamespace for.
+        :param path: the topic the user is asking the DISCOSNamespace for.
         :param wait: a boolean indicating whether to wait for a new message
                      before returning the relative DISCOSNamespace.
         :return: the current or next received DISCOSNamespace.
         """
-        if topic not in self._schemas.keys():
-            raise KeyError(f"Unknown topic '{topic}'")
-        if topic not in self._topics:
-            raise KeyError(f"The client is not subscribed to '{topic}'")
-        value = None
+        base_topic = path.split(".")[0]
+        if base_topic not in self._schemas:
+            raise KeyError(f"Unknown topic '{base_topic}'")
+        if base_topic not in self._topics:
+            raise KeyError(f"The client is not subscribed to '{base_topic}'")
+
         if wait:
             event = asyncio.Event()
             result = {}
             async with self.__waiting_lock:
-                self._waiting.setdefault(topic, []).append((event, result))
+                self._waiting.setdefault(path, []).append((event, result))
             await event.wait()
-            value = result["value"]
-        else:
-            async with self.__locks[topic]:
-                value = self.__dict__[topic]
-        return deepcopy(value)
+            return deepcopy(result["value"])
+        return await self.__resolve_path__(path)

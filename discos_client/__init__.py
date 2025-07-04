@@ -1,3 +1,3 @@
-from .client import FactoryClient as DISCOSClient
+from .client import DISCOSClient
 
 __all__ = ['DISCOSClient']

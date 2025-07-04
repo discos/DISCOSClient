@@ -6,8 +6,9 @@ async def main():
     SRT = DISCOSClient(address='127.0.0.1', asynchronous=True)
     while True:
         antenna = await SRT.get("antenna", wait=True)
+        timestamp = await SRT.get("antenna.timestamp")
         print(
-            antenna.timestamp.iso8601,
+            timestamp.iso8601,
             antenna.observedAzimuth,
             antenna.observedElevation,
             antenna.observedRightAscension,
