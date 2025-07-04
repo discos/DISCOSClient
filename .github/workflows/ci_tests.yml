@@ -32,6 +32,11 @@ jobs:
     - name: Run the unit tests
       run: |
         coverage run -p -m unittest discover -b tests
+    - name: Debug coverage files
+      run: |
+        echo "Current working directory: $(pwd)"
+        echo "Contents:"
+        find . -name ".coverage*" -ls || echo "No coverage files found"
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
       with:
