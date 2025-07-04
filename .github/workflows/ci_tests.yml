@@ -43,7 +43,7 @@ jobs:
       with:
         name: coverage-${{ github.run_id }}-${{ matrix.os }}-${{ matrix.python-version }}
         path: .coverage.*
-        include-hidden-fils: true
+        include-hidden-files: true
     - name: Run the Python linter
       run: |
         prospector
