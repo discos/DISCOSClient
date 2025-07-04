@@ -5,6 +5,10 @@ DISCOSClient
    :target: https://github.com/discos/DISCOSClient/actions/workflows/ci_tests.yml
    :alt: CI Tests
 
+.. image:: https://codecov.io/gh/discos/DISCOSClient/graph/badge.svg?token=6ZYAL74I06
+   :target: https://codecov.io/gh/discos/DISCOSClient
+   :alt: Code Coverage
+
 **DISCOSClient** is a Python client for accessing telemetry data streams from DISCOS
 (Development of the Italian Single-dish COntrol System), the control system used by INAF's radio telescopes.
 
