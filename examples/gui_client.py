@@ -31,7 +31,7 @@ class AntennaGUI:
 
 
 if __name__ == "__main__":
-    SRT = DISCOSClient("antenna", address='192.168.10.200', port='16000')
+    SRT = DISCOSClient("antenna", address='127.0.0.1')
     root = tk.Tk()
     root.title("Antenna Monitor")
     gui = AntennaGUI(root, SRT)

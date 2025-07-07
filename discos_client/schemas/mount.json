@@ -17,7 +17,7 @@
           "type": "number",
           "title": "Current rate",
           "description": "Current axis rate.",
-          "unit": "degress/s"
+          "unit": "degrees/s"
         },
         "currentOffset": {
           "type": "number",
@@ -371,7 +371,7 @@
           "type": "number",
           "title": "Current rate",
           "description": "Current axis rate.",
-          "unit": "degress/s"
+          "unit": "degrees/s"
         },
         "currentTrackingError": {
           "type": "number",
