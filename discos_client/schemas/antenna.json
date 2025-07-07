@@ -279,9 +279,9 @@
     "targetRightAscension",
     "targetVrad",
     "timestamp",
+    "tracking",
     "vradDefinition",
     "vradReferenceFrame",
     "waveLength"
   ]
 }
-

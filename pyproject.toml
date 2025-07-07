@@ -9,9 +9,13 @@ description = "Python client for DISCOS"
 authors = [{ name = "Giuseppe Carboni", email = "giuseppe.carboni@inaf.it" }]
 license = { text = "GPL-3.0-only" }
 requires-python = ">=3.9"
+readme = "README.rst"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
+]
+dependencies = [
+    "pyzmq",
 ]
 
 [tool.setuptools]
@@ -19,3 +23,7 @@ packages = ["discos_client"]
 
 [tool.setuptools.package-data]
 "discos_client" = ["schemas/*.json"]
+
+[project.optional-dependencies]
+test = ["coverage", "prospector"]
+docs = ["sphinx", "sphinx-rtd-theme", "sphinx-autodoc-typehints", "sphinx-jsonschema"]

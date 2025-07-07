@@ -5,6 +5,7 @@
   "description": "Status of the antenna mount.",
   "$defs": {
     "axis_status": {
+      "title": "Axis status",
       "type": "object",
       "properties": {
         "currentPosition": {
@@ -387,7 +388,13 @@
             "$ref": "#/$defs/motor"
           }
         }
-      }
+      },
+      "required": [
+        "currentPosition",
+        "currentRate",
+        "currentTrackingError",
+        "motors"
+      ]
     },
     "pointing": {
       "type": "object",
@@ -406,7 +413,11 @@
           "description": "Current position of the elevation encoder.",
           "unit": "degrees"
         }
-      }
+      },
+      "required": [
+        "azimuthEncoderPosition",
+        "elevationEncoderPosition"
+      ]
     },
     "timestamp": {
       "type": "object",
@@ -457,8 +468,10 @@
     "azimuth",
     "sector",
     "cableWrap",
+    "pointing",
     "status",
     "controlLineError",
+    "remoteDisabled",
     "controlSocketConnected",
     "elevation",
     "emergencyStop",
