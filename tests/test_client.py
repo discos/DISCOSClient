@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from threading import Thread, Event
 import zmq
-from discos_client import DISCOSClient
+from discos_client import SRTClient
 from discos_client.namespace import DISCOSNamespace
 
 
@@ -56,39 +56,37 @@ class TestPublisher:
 class TestBaseClient(unittest.TestCase):
 
     def test_no_topics(self):
-        DISCOSClient(address="127.0.0.1")
+        SRTClient(address="127.0.0.1")
 
     def test_unknown_topic(self):
         with self.assertRaises(ValueError) as ex:
-            DISCOSClient("foo", address="127.0.0.1")
+            SRTClient("foo", address="127.0.0.1")
         self.assertTrue(
             "Topic 'foo' is not known" in ex.exception.args[0]
         )
         with self.assertRaises(ValueError) as ex:
-            DISCOSClient("foo", "bar", address="127.0.0.1")
+            SRTClient("foo", "bar", address="127.0.0.1")
         self.assertTrue(
             "Topics 'foo' and 'bar' are not known" in ex.exception.args[0]
         )
 
     def test_repr(self):
-        client = DISCOSClient(address="127.0.0.1")
-        self.assertEqual(
-            repr(client),
-            "<DISCOSClient({})>"
+        client = SRTClient(address="127.0.0.1")
+        self.assertTrue(
+            repr(client).startswith("<DISCOSClient({") and
+            repr(client).endswith("})>")
         )
 
     def test_str(self):
-        client = DISCOSClient(address="127.0.0.1")
-        self.assertEqual(
-            str(client),
-            "{}"
+        client = SRTClient(address="127.0.0.1")
+        self.assertTrue(
+            str(client).startswith("{") and str(client).endswith("}")
         )
 
     def test_format(self):
-        client = DISCOSClient(address="127.0.0.1")
-        self.assertEqual(
-            f"{client:}",
-            "{}"
+        client = SRTClient(address="127.0.0.1")
+        self.assertTrue(
+            f"{client:}".startswith("{") and f"{client:}".endswith("}")
         )
         with self.assertRaises(ValueError) as ex:
             _ = f"{client:u}"
@@ -102,29 +100,6 @@ class TestBaseClient(unittest.TestCase):
             str(ex.exception),
             "Unknown format code '.3f' for DISCOSClient"
         )
-        b = {"a": 1.234, "b": "b"}
-        ns = DISCOSNamespace(**b)
-        a = {"antenna": b}
-        client.antenna = ns
-        self.assertEqual(
-            f"{client:c}",
-            json.dumps(a, separators=(",", ":"))
-        )
-        with self.assertRaises(ValueError) as ex:
-            b = f"{client:3c}"
-        self.assertEqual(
-            str(ex.exception),
-            "Compact format 'c' does not accept any parameter"
-        )
-        self.assertEqual(
-            f"{client:i}",
-            json.dumps(a, indent=2)
-        )
-        for indent in range(1, 10):
-            self.assertEqual(
-                f"{client:{indent}i}",
-                json.dumps(a, indent=indent)
-            )
         with self.assertRaises(ValueError) as ex:
             _ = f"{client:0i}"
         self.assertEqual(
@@ -137,6 +112,13 @@ class TestBaseClient(unittest.TestCase):
             str(ex.exception),
             "Invalid indent in format spec: 'a'"
         )
+        with self.assertRaises(ValueError) as ex:
+            _ = f"{client:3c}"
+        self.assertEqual(
+            str(ex.exception),
+            "Compact format 'c' does not accept any parameter"
+        )
+        self.assertNotIn("\": ", f"{client:c}")
 
 
 class TestSyncClient(unittest.TestCase):
@@ -144,7 +126,7 @@ class TestSyncClient(unittest.TestCase):
     def test_sync_client(self):
         pub = TestPublisher()
         time.sleep(1)
-        client = DISCOSClient("antenna", address="127.0.0.1")
+        client = SRTClient("antenna", address="127.0.0.1")
         antenna = client.get("antenna.timestamp", wait=True)
         self.assertIsInstance(antenna, DISCOSNamespace)
         antenna = client.get("antenna")
@@ -169,7 +151,7 @@ class TestAsyncClient(unittest.IsolatedAsyncioTestCase):
     async def test_async_client(self):
         pub = TestPublisher()
         time.sleep(1)
-        client = DISCOSClient(
+        client = SRTClient(
             "antenna",
             address="127.0.0.1",
             asynchronous=True

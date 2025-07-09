@@ -39,13 +39,17 @@ def delegated_operations(handler: str) -> Callable[[type], type]:
     return decorator
 
 
-def load_schemas() -> dict[str, dict]:
-    schemas_dir = files("discos_client") / "schemas"
-    schemas = {
-        Path(f.name).stem: json.loads(f.read_text())
-        for f in schemas_dir.iterdir()
-        if f.is_file()
-    }
+def load_schemas(telescope: str | None) -> dict[str, dict]:
+    base_dir = files("discos_client") / "schemas"
+    schemas_dirs = [base_dir / "common"]
+    if telescope:
+        schemas_dirs.append(base_dir / telescope.lower())
+    schemas = {}
+    for d in schemas_dirs:
+        for f in d.iterdir():
+            if f.is_file() and f.name.endswith(".json"):
+                key = Path(f.name).stem
+                schemas[key] = json.loads(f.read_text())
     return schemas
 
 
@@ -62,16 +66,16 @@ def __enrich_properties(
     root_schema: dict[str, Any]
 ) -> dict[str, Any]:
     result = {}
-    for key, value in values.items():
-        prop_schema = __expand_allof(properties.get(key, {}), root_schema)
+    for key, prop_schema in properties.items():
+        prop_schema = __expand_allof(prop_schema, root_schema)
         if "$ref" in prop_schema:
             prop_schema = __resolve_ref(prop_schema["$ref"], root_schema)
-        if isinstance(value, dict) and \
-                prop_schema.get("type") == "object" and \
-                "properties" in prop_schema:
+        value = values.get(key, None)
+        if prop_schema.get("type") == "object" and "properties" in prop_schema:
+            nested_values = value if isinstance(value, dict) else {}
             nested = __enrich_properties(
                 prop_schema["properties"],
-                value,
+                nested_values,
                 root_schema
             )
             enriched = {
@@ -79,19 +83,17 @@ def __enrich_properties(
                 if k not in ("properties", "required")
             }
             enriched.update(nested)
-        elif isinstance(value, list) and \
-                prop_schema.get("type") == "array":
+        elif prop_schema.get("type") == "array":
             item_schema = prop_schema.get("items", {})
             if "$ref" in item_schema:
                 item_schema = __resolve_ref(item_schema["$ref"], root_schema)
             enriched = dict(prop_schema)
-            enriched["items"] = [
+            enriched["value"] = tuple(
                 __enrich_properties(
                     item_schema.get("properties", {}), v, root_schema
-                )
-                if isinstance(v, dict) else {"value": v}
+                ) if isinstance(v, dict) else {"value": v}
                 for v in value
-            ]
+            ) if isinstance(value, list) else tuple()
         else:
             enriched = dict(prop_schema)
             enriched["value"] = value

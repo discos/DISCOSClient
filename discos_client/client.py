@@ -26,7 +26,8 @@ class DISCOSClient:  # noqa
         *topics: str,
         address: str,
         port: int = DEFAULT_PORT,
-        asynchronous: bool = False
+        asynchronous: bool = False,
+        telescope: str | None = None
     ) -> SyncClient | AsyncClient:
         """
         Create an instance of SyncClient or AsyncClient, depending
@@ -37,10 +38,16 @@ class DISCOSClient:  # noqa
         :param port: The TCP port to subscribe to.
         :param asyncronous: If True, returns an AsyncClient;
                             otherwise, a SyncClient.
+        :param telescope: name of the telescope the client is connecting to.
         :return: An instance of SyncClient or AsyncClient.
         """
         client_class = AsyncClient if asynchronous else SyncClient
-        return client_class(*topics, address=address, port=port)
+        return client_class(
+            *topics,
+            address=address,
+            port=port,
+            telescope=telescope
+        )
 
 
 class BaseClient:
@@ -59,19 +66,22 @@ class BaseClient:
         *topics: str,
         address: str,
         port: int,
+        telescope: str | None = None,
     ) -> None:
         """
         Initializes the class instance. Loads the JSON schemas and opens the
         ZMQ socket connection.
 
-        :param topics: The topic names to subscribe to.
-        :param address: The IP address to subscribe to.
-        :param port: The TCP port to subscribe to.
+        :param topics: topic names to subscribe to.
+        :param address: IP address to subscribe to.
+        :param port: TCP port to subscribe to.
+        :param telescope: name of the telescope the client is connecting to.
         """
         self._context = zmq.Context()
         self._socket = self._context.socket(zmq.SUB)
         self._socket.connect(f'tcp://{address}:{port}')
-        self._schemas = load_schemas()
+        self._telescope = telescope
+        self._schemas = load_schemas(self._telescope)
         valid_topics = list(self._schemas.keys())
 
         invalid = [t for t in topics if t not in valid_topics]
@@ -118,7 +128,8 @@ class BaseClient:
                 )
                 self.__update_namespace__(topic, payload)
             except zmq.Again:  # pragma: no cover
-                pass
+                dummy = merge_schema(self._schemas[t], {})
+                self.__update_namespace__(t, DISCOSNamespace(**dummy))
             self._socket.unsubscribe(f'{rand_id}_{t}')
         self._socket.setsockopt(zmq.RCVTIMEO, -1)
         for topic in self._topics:
@@ -153,7 +164,7 @@ class BaseClient:
         :param message: The received JSON message, containing key-value pairs.
         :param schemas: The schemas dictionary.
         :param rand_id: Random identifier. Used to remove the said ID from the
-                        topic name. After initialization will always be None.
+                        topic name.
         :return: The merged DISCOSNamespace object.
         """
         topic, _, payload = message.partition(' ')
@@ -185,11 +196,10 @@ class BaseClient:
         """
         Custom format method.
 
-        :param spec: The format specifier. It can be:
-                     'c' for compact JSON representation
-                     'i' for multi-line, indented JSON representation.
-                     'i' can be preceeded by a number, which will be the
-                     desired indentation. Default is 2.
+        :param spec: Format specifier. 'c' – compact JSON, \
+'i' or '<n>i' – indented JSON, \
+with optional indentation level <n> (default is 2)
+
         :return: A JSON formatted string.
         """
         if not spec:
@@ -269,6 +279,7 @@ class SyncClient(BaseClient):
         *topics: str,
         address: str,
         port: int,
+        telescope: str | None,
     ) -> None:
         """
         Initializes the DISCOSClient base and SyncClient object,
@@ -278,8 +289,14 @@ class SyncClient(BaseClient):
         :param topics: The topic names to subscribe to.
         :param address: The IP address to subscribe to.
         :param port: The TCP port to subscribe to.
+        :param telescope: name of the telescope the client is connecting to.
         """
-        super().__init__(*topics, address=address, port=port)
+        super().__init__(
+            *topics,
+            address=address,
+            port=port,
+            telescope=telescope
+        )
         self.__waiting_lock = threading.Lock()
         self.__locks = defaultdict(threading.Lock)
         self.__update_thread = threading.Thread(
@@ -362,6 +379,7 @@ class AsyncClient(BaseClient):
         *topics: str,
         address: str,
         port: int,
+        telescope: str | None,
     ) -> None:
         """
         Initialize the DISCOSClient base and AsyncClient object,
@@ -371,8 +389,14 @@ class AsyncClient(BaseClient):
         :param topics: The topic names to subscribe to.
         :param address: The IP address to subscribe to.
         :param port: The TCP port to subscribe to.
+        :param telescope: name of the telescope the client is connecting to.
         """
-        super().__init__(*topics, address=address, port=port)
+        super().__init__(
+            *topics,
+            address=address,
+            port=port,
+            telescope=telescope
+        )
         self.__waiting_lock = asyncio.Lock()
         self.__locks = defaultdict(asyncio.Lock)
         self.__loop = asyncio.get_running_loop()

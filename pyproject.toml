@@ -22,7 +22,7 @@ dependencies = [
 packages = ["discos_client"]
 
 [tool.setuptools.package-data]
-"discos_client" = ["schemas/*.json"]
+"discos_client" = ["schemas/**"]
 
 [project.optional-dependencies]
 test = ["coverage", "prospector"]
