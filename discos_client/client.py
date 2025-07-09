@@ -24,8 +24,8 @@ class DISCOSClient:  # noqa
         *topics: str,
         address: str,
         port: int,
+        telescope: str | None = None,
         asynchronous: bool = False,
-        telescope: str | None = None
     ) -> SyncClient | AsyncClient:
         """
         Create an instance of SyncClient or AsyncClient, depending
@@ -34,10 +34,15 @@ class DISCOSClient:  # noqa
         :param topics: The topic names to subscribe to.
         :param address: The IP address to subscribe to.
         :param port: The TCP port to subscribe to.
-        :param asyncronous: If True, returns an AsyncClient;
-                            otherwise, a SyncClient.
         :param telescope: name of the telescope the client is connecting to.
-        :return: An instance of SyncClient or AsyncClient.
+        :param asyncronous: If True, returns an
+                            :class:`~discos_client.client.AsyncClient`
+                            otherwise, a
+                            :class:`~discos_client.client.SyncClient`
+        :return: An instance of :class:`~discos_client.client.SyncClient` or
+                :class:`~discos_client.client.AsyncClient`
+        :rtype: :class:`~discos_client.client.SyncClient` |
+                :class:`~discos_client.client.AsyncClient`
         """
         client_class = AsyncClient if asynchronous else SyncClient
         return client_class(
