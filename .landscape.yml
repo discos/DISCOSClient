@@ -7,3 +7,4 @@ autodetect: false
 ignore-paths:
   - build
   - examples
+  - docs

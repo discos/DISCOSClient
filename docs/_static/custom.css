@@ -1,0 +1,17 @@
+.wy-nav-content {
+    min-width: 1200px;
+    margin: 0;
+    float: left;
+}
+.rst-content table.docutils {
+    width: 100%;
+    table-layout: auto;
+    border-collapse: collapse;
+}
+.rst-content table.docutils col:last-child {
+    width: auto;
+}
+.rst-content table.docutils td,
+.rst-content table.docutils th {
+    white-space: pre-wrap;
+}
