@@ -10,8 +10,6 @@ import zmq
 from .namespace import DISCOSNamespace
 from .utils import load_schemas, merge_schema
 
-DEFAULT_PORT = 16000
-
 
 class DISCOSClient:  # noqa
     """
@@ -25,7 +23,7 @@ class DISCOSClient:  # noqa
         cls,
         *topics: str,
         address: str,
-        port: int = DEFAULT_PORT,
+        port: int,
         asynchronous: bool = False,
         telescope: str | None = None
     ) -> SyncClient | AsyncClient:
