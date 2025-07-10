@@ -55,6 +55,13 @@ Project Structure
 - ``discos_client/schemas/``    – JSON schemas used as structural metadata
 - ``tests/``                    – Unit tests
 
+Documentation
+-------------
+
+For more details, read the full documentation, available at:
+
+📘 https://discosclient.readthedocs.io/en/latest/
+
 License
 -------
 
