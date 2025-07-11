@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath('../discos_client'))
 project = 'DISCOSClient'
 copyright = '2025, Giuseppe Carboni'
 author = 'Giuseppe Carboni'
-release = '0.1.0'
+release = '0.2.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -85,11 +85,6 @@ def _patched_sphinx_jsonschema_simpletype(self, schema):
                 self._cell('enum'),
                 self._cell('\n'.join(
                     [str(e) for e in schema['enum']]))))
-        #rows.append(
-        #    self._line(
-        #        self._cell('enum'),
-        #        self._cell(', '.join(
-        #            [str(e) for e in schema['enum']]))))
         del schema['enum']
 
     if 'examples' in schema:

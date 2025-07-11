@@ -1,5 +1,6 @@
 import unittest
 import json
+from pathlib import Path
 from copy import deepcopy
 from discos_client.namespace import DISCOSNamespace
 
@@ -40,7 +41,7 @@ class TestDISCOSNamespace(unittest.TestCase):
         a = "a"
         d = {"a": a}
         ns = DISCOSNamespace(**d)
-        self.assertEqual(str(ns), json.dumps(d, indent=2))
+        self.assertEqual(str(ns), json.dumps(d))
         d = {"value": a}
         ns = DISCOSNamespace(**d)
         self.assertEqual(str(ns), f"{a}")
@@ -151,43 +152,52 @@ class TestDISCOSNamespace(unittest.TestCase):
         )
         self.assertEqual(
             f"{ns:c}",
-            json.dumps(b, separators=(",", ":"))
+            json.dumps({"a": a}, separators=(",", ":"))
         )
         with self.assertRaises(ValueError) as ex:
-            b = f"{ns:3c}"
+            _ = f"{ns:3c}"
         self.assertEqual(
             str(ex.exception),
-            "Compact format 'c' does not accept any parameter"
+            "Unknown format code '3c' for DISCOSNamespace"
         )
         self.assertEqual(
             f"{ns:i}",
-            json.dumps(b, indent=2)
+            json.dumps({"a": a}, indent=2)
+        )
+        self.assertEqual(
+            f"{ns:f}",
+            json.dumps(b)
         )
         for indent in range(1, 10):
             self.assertEqual(
                 f"{ns:{indent}i}",
+                json.dumps({"a": a}, indent=indent)
+            )
+            self.assertEqual(
+                f"{ns:f{indent}i}",
                 json.dumps(b, indent=indent)
             )
         with self.assertRaises(ValueError) as ex:
-            b = f"{ns:0i}"
+            _ = f"{ns:0i}"
         self.assertEqual(
             str(ex.exception),
             "Indentation must be a positive integer"
         )
         with self.assertRaises(ValueError) as ex:
-            b = f"{ns:ai}"
+            _ = f"{ns:ai}"
         self.assertEqual(
             str(ex.exception),
             "Invalid indent in format spec: 'a'"
         )
-        self.assertEqual(f"{ns:}", str(ns))
-        b = {"a": a, "b": ["a", "b"]}
-        ns = DISCOSNamespace(**b)
-        b2 = {"a": a, "b": {"items": ["a", "b"]}}
-        self.assertEqual(
-            f"{ns:i}",
-            json.dumps(b2, indent=2)
-        )
+
+        messages_dir = Path(__file__).resolve().parent
+        message_files = messages_dir.glob("messages/*.json")
+        for message in message_files:
+            with open(message, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                ns = DISCOSNamespace(**d)
+                self.assertEqual(f"{ns}", json.dumps(d))
+                _ = f"{ns:f}"
 
     def test_op(self):
         a = 2

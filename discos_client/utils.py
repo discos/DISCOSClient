@@ -1,14 +1,18 @@
 from __future__ import annotations
 import json
 import operator
-from typing import Any, Callable
+from typing import Any, Callable, TYPE_CHECKING
 from importlib.resources import files
 from pathlib import Path
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .namespace import DISCOSNamespace
 
 __all__ = [
     "delegated_operations",
     "load_schemas",
     "merge_schema",
+    "public_dict"
 ]
 
 
@@ -53,11 +57,69 @@ def load_schemas(telescope: str | None) -> dict[str, dict]:
     return schemas
 
 
+def public_dict(
+    obj: DISCOSNamespace,
+    is_fn,
+    get_value_fn,
+    typename: str
+) -> Any:
+    d = {}
+    for k, v in vars(obj).items():
+        if k == f"_{typename}__value":
+            d.update(__serialize_value(v, is_fn, get_value_fn, typename))
+        elif not k.startswith("_"):
+            if k == "enum" and is_fn(v):
+                d[k] = __unwrap_enum(v, is_fn, get_value_fn)
+            else:
+                d[k] = public_dict(
+                    v,
+                    is_fn,
+                    get_value_fn,
+                    typename
+                ) if is_fn(v) else v
+    return d
+
+
+def __serialize_value(
+    value: Any,
+    is_fn,
+    get_value_fn,
+    typename: str
+) -> dict[str, Any]:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return {"value": value}
+    if isinstance(value,  (list, tuple)):
+        return {
+            "items": [
+                public_dict(
+                    v,
+                    is_fn,
+                    get_value_fn,
+                    typename
+                ) for v in value
+            ]
+        }
+    return {"value": value}
+
+
+def __unwrap_enum(value: Any, is_fn, get_value_fn) -> Any:
+    while is_fn(value):
+        value = get_value_fn(value)
+    return list(value) if isinstance(value, (list, tuple)) else value
+
+
 def merge_schema(
     schema: dict[str, Any],
     message: dict[str, Any]
 ) -> dict[str, Any]:
-    return __enrich_properties(schema["properties"], message, schema)
+    enriched = __enrich_properties(schema["properties"], message, schema)
+    return {
+        **{
+            k: v for k, v in schema.items()
+            if k in ("title", "type", "description")
+        },
+        **enriched
+    }
 
 
 def __enrich_properties(
@@ -69,7 +131,11 @@ def __enrich_properties(
     for key, prop_schema in properties.items():
         prop_schema = __expand_allof(prop_schema, root_schema)
         if "$ref" in prop_schema:
-            prop_schema = __resolve_ref(prop_schema["$ref"], root_schema)
+            resolved = __resolve_ref(prop_schema["$ref"], root_schema)
+            prop_schema = {
+                **{k: v for k, v in prop_schema.items() if k != "$ref"},
+                **resolved
+            }
         value = values.get(key, None)
         if prop_schema.get("type") == "object" and "properties" in prop_schema:
             nested_values = value if isinstance(value, dict) else {}
@@ -79,21 +145,36 @@ def __enrich_properties(
                 root_schema
             )
             enriched = {
-                k: v for k, v in prop_schema.items()
-                if k not in ("properties", "required")
+                **{
+                    k: v for k, v in prop_schema.items()
+                    if k in ("type", "title", "description")
+                },
+                **nested
             }
-            enriched.update(nested)
         elif prop_schema.get("type") == "array":
-            item_schema = prop_schema.get("items", {})
-            if "$ref" in item_schema:
-                item_schema = __resolve_ref(item_schema["$ref"], root_schema)
+            raw_item_schema = prop_schema.get("items", {})
+            if "$ref" in raw_item_schema:
+                resolved = __resolve_ref(raw_item_schema["$ref"], root_schema)
+                item_schema = {
+                    **resolved,
+                    **{k: v for k, v in raw_item_schema.items() if k != "$ref"}
+                }
+            else:
+                item_schema = raw_item_schema
+            item_metadata = {
+                k: v for k, v in item_schema.items()
+                if k in ("type", "title", "description")
+            }
             enriched = dict(prop_schema)
-            enriched["value"] = tuple(
-                __enrich_properties(
-                    item_schema.get("properties", {}), v, root_schema
-                ) if isinstance(v, dict) else {"value": v}
+            enriched["value"] = [
+                {
+                    **item_metadata,
+                    **__enrich_properties(
+                        item_schema.get("properties", {}), v, root_schema
+                    )
+                } if isinstance(v, dict) else {"value": v}
                 for v in value
-            ) if isinstance(value, list) else tuple()
+            ] if isinstance(value, list) else []
         else:
             enriched = dict(prop_schema)
             enriched["value"] = value

@@ -193,53 +193,56 @@ class BaseClient:
 
         :return: A JSON representation of the object, with indentation=2
         """
-        return format(self, "2i")
+        return format(self, "")
 
     def __format__(self, spec: str) -> str:
         """
         Custom format method.
 
-        :param spec: Format specifier. 'c' – compact JSON, \
-'i' or '<n>i' – indented JSON, \
+        :param spec: Format specifier.
+
+            | 'c' - compact JSON
+            | '<n>i' - indented JSON \
 with optional indentation level <n> (default is 2)
+            | 'f' - full representation with metadata
 
         :return: A JSON formatted string.
         """
-        if not spec:
-            return str(self)
+        fmt_spec = spec[1:] if spec.startswith("f") else spec
+        fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("f") else fmt_spec
 
         indent = None
         separators = None
+        default = DISCOSNamespace.__full_dict__ if fmt_spec != spec \
+            else DISCOSNamespace.__message_dict__
 
-        fmt_type = spec[-1]
-        fmt_param = spec[:-1]
-
-        if fmt_type == "i":
+        if fmt_spec == "":
+            pass
+        elif fmt_spec == "c":
+            separators = (",", ":")
+        elif fmt_spec.endswith("i"):
+            fmt_par = fmt_spec[:-1]
             indent = 2
-            if fmt_param:
+            if fmt_par:
                 try:
-                    indent = int(spec[:-1])
+                    indent = int(fmt_par)
                 except ValueError as exc:
                     raise ValueError(
-                        f"Invalid indent in format spec: '{fmt_param}'"
+                        f"Invalid indent in format spec: '{fmt_spec[:-1]}'"
                     ) from exc
                 if indent <= 0:
                     raise ValueError("Indentation must be a positive integer")
-        elif fmt_type == "c":
-            if fmt_param:
-                raise ValueError(
-                    "Compact format 'c' does not accept any parameter"
-                )
-            separators = (",", ":")
         else:
             raise ValueError(
                 f"Unknown format code '{spec}' for {self.__typename__}"
             )
+
         return json.dumps(
             self.__public_dict__(),
-            default=DISCOSNamespace.__public_dict__,
+            default=default,
             indent=indent,
-            separators=separators
+            separators=separators,
+            sort_keys=True
         )
 
     def __public_dict__(self) -> dict[str, DISCOSNamespace]:

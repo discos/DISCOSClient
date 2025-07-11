@@ -43,4 +43,4 @@ DISCOSNamespace
                      __len__, __iter__, __setattr__, __delattr__,
                      __ilshift__, __format__, __deepcopy__,
                      __get_value__, __has_value__, __is__,
-                     __public_dict__, __value_repr__
+                     __full_dict__, __message_dict__, __value_repr__

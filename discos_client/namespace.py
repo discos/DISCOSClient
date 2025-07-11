@@ -2,7 +2,7 @@ from __future__ import annotations
 import json
 from copy import deepcopy
 from typing import Any, Callable, Iterator
-from .utils import delegated_operations
+from .utils import delegated_operations, public_dict
 
 
 @delegated_operations('__value_operation__')
@@ -70,7 +70,7 @@ class DISCOSNamespace:
         """Return a string representation of the object."""
         if self.__has_value__(self):
             return str(self.__get_value__(self))
-        return format(self, "2i")
+        return format(self, "")
 
     def __int__(self) -> int:
         """Return the internal value as an integer."""
@@ -163,49 +163,53 @@ class DISCOSNamespace:
         """
         Custom format method.
 
-        :param spec: Format specifier. 'c' – compact JSON, \
-'i' or '<n>i' – indented JSON, \
+        :param spec: Format specifier.
+
+            | 'c' - compact JSON
+            | '<n>i' - indented JSON \
 with optional indentation level <n> (default is 2)
+            | 'f' - full representation with metadata
 
         :return: A JSON formatted string.
         """
         if self.__has_value__(self):
             return format(self.__get_value__(self), spec)
-        if not spec:
-            return str(self)
+
+        fmt_spec = spec[1:] if spec.startswith("f") else spec
+        fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("f") else fmt_spec
 
         indent = None
         separators = None
+        default = \
+            self.__full_dict__ if fmt_spec != spec else self.__message_dict__
 
-        fmt_type = spec[-1]
-        fmt_param = spec[:-1]
-
-        if fmt_type == "i":
+        if fmt_spec == "":
+            pass
+        elif fmt_spec == "c":
+            separators = (",", ":")
+        elif fmt_spec.endswith("i"):
+            fmt_par = fmt_spec[:-1]
             indent = 2
-            if fmt_param:
+            if fmt_par:
                 try:
-                    indent = int(spec[:-1])
+                    indent = int(fmt_par)
                 except ValueError as exc:
                     raise ValueError(
-                        f"Invalid indent in format spec: '{fmt_param}'"
+                        f"Invalid indent in format spec: '{fmt_spec[:-1]}'"
                     ) from exc
                 if indent <= 0:
                     raise ValueError("Indentation must be a positive integer")
-        elif fmt_type == "c":
-            if fmt_param:
-                raise ValueError(
-                    "Compact format 'c' does not accept any parameter"
-                )
-            separators = (",", ":")
         else:
             raise ValueError(
                 f"Unknown format code '{spec}' for {self.__typename__}"
             )
+
         return json.dumps(
             self,
-            default=self.__public_dict__,
+            default=default,
             indent=indent,
-            separators=separators
+            separators=separators,
+            sort_keys=True
         )
 
     def __deepcopy__(self, memo):
@@ -216,7 +220,7 @@ with optional indentation level <n> (default is 2)
         :return: A new deepcopy of this object.
         """
         cls = self.__class__
-        public = cls.__public_dict__(self)
+        public = cls.__full_dict__(self)
         copied = deepcopy(public, memo)
         return cls(**copied)
 
@@ -254,23 +258,44 @@ with optional indentation level <n> (default is 2)
         return isinstance(obj, cls)
 
     @classmethod
-    def __public_dict__(cls, obj: DISCOSNamespace) -> dict[str, Any]:
+    def __full_dict__(cls, obj: DISCOSNamespace) -> dict[str, Any]:
         """
         Return a dictionary representation for JSON serialization.
 
         :param obj: The object to convert.
+        :return: A dictionary with public fields and metadata.
+        """
+        return public_dict(
+            obj,
+            cls.__is__,
+            cls.__get_value__,
+            cls.__typename__
+        )
+
+    @classmethod
+    def __message_dict__(cls, obj: DISCOSNamespace) -> dict[str, Any]:
+        """
+        Return the pure message (value-only) dictionary,
+        removing schema metadata.
+
+        :param obj: The object to convert.
         :return: A dictionary with public fields.
         """
-        public_dict = {}
-        for k, v in vars(obj).items():
-            if k == f"_{cls.__typename__}__value":
-                key = "items" if isinstance(v, tuple) else "value"
-                public_dict[key] = list(v) if isinstance(v, tuple) else v
-            elif not k.startswith("_"):
-                public_dict[k] = list(v) if isinstance(v, tuple) else v
-        if "enum" in public_dict and cls.__is__(public_dict["enum"]):
-            public_dict["enum"] = cls.__get_value__(public_dict["enum"])
-        return public_dict
+        def unwrap(value: Any) -> Any:
+            skip = ("type", "title", "description", "enum", "unit", "format")
+            if cls.__is__(value):
+                if cls.__has_value__(value):
+                    return unwrap(cls.__get_value__(value))
+                retval = {}
+                for k, v in vars(value).items():
+                    if k in skip:
+                        continue
+                    retval[k] = unwrap(v)
+                return retval
+            if isinstance(value, (list, tuple)):
+                return [unwrap(v) for v in value]
+            return value
+        return unwrap(obj)
 
     @classmethod
     def __value_repr__(cls, obj: Any) -> Any:

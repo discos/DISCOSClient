@@ -1,12 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "mount",
   "type": "object",
+  "title": "Mount status",
   "description": "Status of the antenna mount.",
   "$defs": {
     "axis_status": {
-      "title": "Axis status",
       "type": "object",
+      "title": "Axis status",
+      "description": "Status of an axis",
       "properties": {
         "currentPosition": {
           "type": "number",
@@ -273,7 +274,7 @@
       "title": "Control communication line error",
       "description": "Error in control communication line."
     },
-    "remoteDisabled": {
+    "remoteControlDisabled": {
       "type": "boolean",
       "title": "Remote control disabled",
       "description": "Remote control disabled."
@@ -292,12 +293,6 @@
       "type": "boolean",
       "title": "Time error",
       "description": "Time error."
-    },
-    "timeOffset": {
-      "type": "number",
-      "title": "Time offset",
-      "description": "ACU time offset in fraction of day.",
-      "unit": "days"
     },
     "programTrackError": {
       "type": "boolean",
@@ -329,21 +324,8 @@
         "FAILURE"
       ]
     },
-    "remainingTrackingPoints": {
-      "type": "integer",
-      "title": "Remaining tracking points",
-      "description": "Number of remaining points in the tracking trajectory."
-    },
-    "sector": {
-      "type": "string",
-      "title": "Azimuth sector",
-      "description": "Current azimuth travel sector.",
-      "enum": [
-        "CW",
-        "CCW"
-      ]
-    },
     "azimuth": {
+      "type": "object",
       "title": "Azimuth axis status",
       "description": "Azimuth axis status of the antenna mount.",
       "allOf": [
@@ -351,6 +333,7 @@
       ]
     },
     "elevation": {
+      "type": "object",
       "title": "Elevation axis status",
       "description": "Elevation axis status of the antenna mount.",
       "allOf": [
@@ -412,11 +395,34 @@
           "title": "Elevation encoder position",
           "description": "Current position of the elevation encoder.",
           "unit": "degrees"
+        },
+        "remainingTrackingPoints": {
+          "type": "integer",
+          "title": "Remaining tracking points",
+          "description": "Number of remaining points in the tracking trajectory."
+        },
+        "sector": {
+          "type": "string",
+          "title": "Azimuth sector",
+          "description": "Current azimuth travel sector.",
+          "enum": [
+            "CW",
+            "CCW"
+          ]
+        },
+        "timeOffset": {
+          "type": "number",
+          "title": "Time offset",
+          "description": "ACU time offset in fraction of day.",
+          "unit": "days"
         }
       },
       "required": [
         "azimuthEncoderPosition",
-        "elevationEncoderPosition"
+        "elevationEncoderPosition",
+        "remainingTrackingPoints",
+        "sector",
+        "timeOffset"
       ]
     },
     "timestamp": {
@@ -424,12 +430,6 @@
       "title": "Timestamps",
       "description": "Collection of timestamp representations for the data sample.",
       "properties": {
-        "omg": {
-          "type": "integer",
-          "title": "Object Management Group Time",
-          "description": "Elapsed time since the OMG epoch (1582-10-15T00:00:00.000Z).",
-          "unit": "100ns"
-        },
         "iso8601": {
           "type": "string",
           "title": "ISO 8601",
@@ -448,6 +448,12 @@
           "description": "Modified Julian Date.",
           "unit": "days"
         },
+        "omg": {
+          "type": "integer",
+          "title": "Object Management Group Time",
+          "description": "Elapsed time since the OMG epoch (1582-10-15T00:00:00.000Z).",
+          "unit": "100ns"
+        },
         "unix_time": {
           "type": "number",
           "title": "UNIX Time",
@@ -456,35 +462,31 @@
         }
       },
       "required": [
-        "omg",
         "iso8601",
         "jd",
         "mjd",
+        "omg",
         "unix_time"
       ]
     }
   },
   "required": [
     "azimuth",
-    "sector",
     "cableWrap",
-    "pointing",
-    "status",
     "controlLineError",
-    "remoteDisabled",
     "controlSocketConnected",
     "elevation",
     "emergencyStop",
     "mainPowerError",
     "messageSyncError",
+    "pointing",
     "programTrackError",
-    "remainingTrackingPoints",
     "remoteCommandError",
     "remoteControlDisabled",
+    "status",
     "statusLineError",
     "statusSocketConnected",
     "timeError",
-    "timeOffset",
     "timestamp"
   ]
 }

@@ -42,7 +42,11 @@ class TestPublisher:
                     topic = event[1:].decode()
                     if "_" in topic:
                         t = topic.partition("_")[-1]
-                        self.socket.send_string(f"{topic} {self.messages[t]}")
+                        try:
+                            message = self.messages[t]
+                            self.socket.send_string(f"{topic} {message}")
+                        except KeyError:
+                            pass
             for topic, payload in self.messages.items():
                 self.socket.send_string(f'{topic} {payload}')
 
@@ -116,7 +120,7 @@ class TestBaseClient(unittest.TestCase):
             _ = f"{client:3c}"
         self.assertEqual(
             str(ex.exception),
-            "Compact format 'c' does not accept any parameter"
+            "Unknown format code '3c' for DISCOSClient"
         )
         self.assertNotIn("\": ", f"{client:c}")
 
