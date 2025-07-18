@@ -8,7 +8,7 @@ from copy import deepcopy
 from typing import Any
 import zmq
 from .namespace import DISCOSNamespace
-from .utils import load_schemas, merge_schema
+from .utils import SchemaMerger
 
 
 class DISCOSClient:  # noqa
@@ -72,8 +72,7 @@ class BaseClient:
         telescope: str | None = None,
     ) -> None:
         """
-        Initializes the class instance. Loads the JSON schemas and opens the
-        ZMQ socket connection.
+        Initializes the class instance.
 
         :param topics: topic names to subscribe to.
         :param address: IP address to subscribe to.
@@ -84,8 +83,8 @@ class BaseClient:
         self._socket = self._context.socket(zmq.SUB)
         self._socket.connect(f'tcp://{address}:{port}')
         self._telescope = telescope
-        self._schemas = load_schemas(self._telescope)
-        valid_topics = list(self._schemas.keys())
+        self._schema_merger = SchemaMerger(telescope)
+        valid_topics = self._schema_merger.get_topics()
 
         invalid = [t for t in topics if t not in valid_topics]
         if invalid:
@@ -101,7 +100,7 @@ class BaseClient:
                 f"'{valid_topics[-1]}'"
             )
         if not topics:
-            topics = self._schemas.keys()
+            topics = self._schema_merger.get_topics()
         self._topics = list(topics)
         self._waiting = defaultdict(list)
         self.__initialize__()
@@ -126,12 +125,12 @@ class BaseClient:
                 message = self._socket.recv_string()
                 topic, payload = self.__to_namespace__(
                     message,
-                    self._schemas,
+                    self._schema_merger,
                     rand_id
                 )
                 self.__update_namespace__(topic, payload)
             except zmq.Again:  # pragma: no cover
-                dummy = merge_schema(self._schemas[t], {})
+                dummy = self._schema_merger.merge_schema(t, {})
                 self.__update_namespace__(t, DISCOSNamespace(**dummy))
             self._socket.unsubscribe(f'{rand_id}_{t}')
         self._socket.setsockopt(zmq.RCVTIMEO, -1)
@@ -158,14 +157,14 @@ class BaseClient:
     @staticmethod
     def __to_namespace__(
         message: str,
-        schemas: dict,
+        merger: SchemaMerger,
         rand_id: str = None
     ) -> DISCOSNamespace:
         """
         Merges a schema and a message into a DISCOSNamespace.
 
         :param message: The received JSON message, containing key-value pairs.
-        :param schemas: The schemas dictionary.
+        :param merger: The schema merger object.
         :param rand_id: Random identifier. Used to remove the said ID from the
                         topic name.
         :return: The merged DISCOSNamespace object.
@@ -173,8 +172,8 @@ class BaseClient:
         topic, _, payload = message.partition(' ')
         if rand_id:
             topic = topic.replace(f"{rand_id}_", "")
-        payload = merge_schema(
-            schemas[topic],
+        payload = merger.merge_schema(
+            topic,
             json.loads(payload)
         )
         return topic, DISCOSNamespace(**payload)
@@ -318,7 +317,10 @@ class SyncClient(BaseClient):
         """
         while True:
             message = self._socket.recv_string()
-            topic, payload = self.__to_namespace__(message, self._schemas)
+            topic, payload = self.__to_namespace__(
+                message,
+                self._schema_merger
+            )
             with self.__locks[topic]:
                 self.__update_namespace__(topic, payload)
 
@@ -359,7 +361,7 @@ class SyncClient(BaseClient):
         :return: the current or next received DISCOSNamespace or value.
         """
         base_topic = path.split(".")[0]
-        if base_topic not in self._schemas:
+        if base_topic not in self._schema_merger.get_topics():
             raise KeyError(f"Unknown topic '{base_topic}'")
         if base_topic not in self._topics:
             raise KeyError(f"The client is not subscribed to '{base_topic}'")
@@ -419,7 +421,10 @@ class AsyncClient(BaseClient):
                     None,
                     self._socket.recv_string
                 )
-                topic, payload = self.__to_namespace__(message, self._schemas)
+                topic, payload = self.__to_namespace__(
+                    message,
+                    self._schema_merger
+                )
                 async with self.__locks[topic]:
                     self.__update_namespace__(topic, payload)
 
@@ -466,7 +471,7 @@ class AsyncClient(BaseClient):
         :return: the current or next received DISCOSNamespace.
         """
         base_topic = path.split(".")[0]
-        if base_topic not in self._schemas:
+        if base_topic not in self._schema_merger.get_topics():
             raise KeyError(f"Unknown topic '{base_topic}'")
         if base_topic not in self._topics:
             raise KeyError(f"The client is not subscribed to '{base_topic}'")

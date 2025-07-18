@@ -315,14 +315,7 @@
       "description": "Status socket status."
     },
     "status": {
-      "type": "string",
-      "title": "Mount component status",
-      "description": "Overall status of the mount system.",
-      "enum": [
-        "OK",
-        "WARNING",
-        "FAILURE"
-      ]
+      "$ref": "definitions/status.json"
     },
     "azimuth": {
       "type": "object",
@@ -426,48 +419,7 @@
       ]
     },
     "timestamp": {
-      "type": "object",
-      "title": "Timestamps",
-      "description": "Collection of timestamp representations for the data sample.",
-      "properties": {
-        "iso8601": {
-          "type": "string",
-          "title": "ISO 8601",
-          "description": "Full ISO 8601 timestamp.",
-          "format": "date-time"
-        },
-        "jd": {
-          "type": "number",
-          "title": "Julian Date",
-          "description": "Continuous Julian Date.",
-          "unit": "days"
-        },
-        "mjd": {
-          "type": "number",
-          "title": "Modified Julian Date",
-          "description": "Modified Julian Date.",
-          "unit": "days"
-        },
-        "omg": {
-          "type": "integer",
-          "title": "Object Management Group Time",
-          "description": "Elapsed time since the OMG epoch (1582-10-15T00:00:00.000Z).",
-          "unit": "100ns"
-        },
-        "unix_time": {
-          "type": "number",
-          "title": "UNIX Time",
-          "description": "Elapsed time measured in seconds since the UNIX epoch at 1970-01-01T00:00:00 UTC.",
-          "unit": "seconds"
-        }
-      },
-      "required": [
-        "iso8601",
-        "jd",
-        "mjd",
-        "omg",
-        "unix_time"
-      ]
+      "$ref": "definitions/timestamp.json"
     }
   },
   "required": [

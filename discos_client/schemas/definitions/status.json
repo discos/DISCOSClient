@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "status.json",
+  "title": "System status",
+  "description": "Operational status of the system.",
+  "type": "string",
+  "enum": ["OK", "WARNING", "FAILURE"]
+}

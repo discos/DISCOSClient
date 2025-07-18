@@ -31,24 +31,48 @@ class TestPublisher:
         self.event = Event()
         self.t.start()
 
+    def _handle_subscription(self, poller):
+        events = dict(poller.poll(100))
+        if self.socket in events:
+            event = self.socket.recv()
+            if event[0] != 1:
+                return
+            topic = event[1:].decode()
+            if "_" in topic:
+                t = topic.partition("_")[-1]
+                if t in self.messages:
+                    self.socket.send_string(
+                        f"{topic} {self.messages[t]}"
+                    )
+                else:
+                    subparts = {}
+                    for key, val in self.messages.items():
+                        if key.startswith(f"{t}."):
+                            subkey = key[len(t) + 1:]
+                            subparts[subkey] = json.loads(val)
+                    if subparts:
+                        merged = json.dumps(
+                            subparts,
+                            separators=(",", ":")
+                        )
+                        self.socket.send_string(f"{topic} {merged}")
+
+    def _send_periodic_messages(self):
+        for topic, payload in self.messages.items():
+            if "." in topic:
+                topic, obj = topic.split(".", 1)
+                payload = json.dumps(
+                    {obj: json.loads(payload)},
+                    separators=(",", ":")
+                )
+            self.socket.send_string(f"{topic} {payload}")
+
     def publish(self):
         poller = zmq.Poller()
         poller.register(self.socket, zmq.POLLIN)
         while not self.event.is_set():
-            events = dict(poller.poll(100))
-            if self.socket in events:
-                event = self.socket.recv()
-                if event[0] == 1:
-                    topic = event[1:].decode()
-                    if "_" in topic:
-                        t = topic.partition("_")[-1]
-                        try:
-                            message = self.messages[t]
-                            self.socket.send_string(f"{topic} {message}")
-                        except KeyError:
-                            pass
-            for topic, payload in self.messages.items():
-                self.socket.send_string(f'{topic} {payload}')
+            self._handle_subscription(poller)
+            self._send_periodic_messages()
 
     def close(self):
         self.event.set()
