@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "common/weather.json",
+  "title": "Weather status",
+  "type": "object",
+  "description": "Status of the site weather.",
+  "node": "weather",
+  "properties": {
+    "autoParkThreshold": {
+      "type": "number",
+      "title": "Automatic Park Threshold",
+      "description": "Speed threshold above which the antenna is automatically parked.",
+      "unit": "Km/h"
+    },
+    "humidity": {
+      "type": "number",
+      "title": "Humidity",
+      "description": "Relative humidity of the air.",
+      "unit": "%"
+    },
+    "pressure": {
+      "type": "number",
+      "title": "Pressure",
+      "description": "Atmospheric pressure.",
+      "unit": "hPa"
+    },
+    "temperature": {
+      "type": "number",
+      "title": "Temperature",
+      "description": "Ambient air temperature.",
+      "unit": "°C"
+    },
+    "timestamp": {
+      "$ref": "definitions/timestamp.json"
+    },
+    "windDirection": {
+      "type": "number",
+      "title": "Wind Direction",
+      "description": "Direction from which the wind is blowing.",
+      "unit": "degrees"
+    },
+    "windSpeed": {
+      "type": "number",
+      "title": "Wind Speed",
+      "description": "Current wind speed.",
+      "unit": "Km/h"
+    },
+    "windSpeedPeak": {
+      "type": "number",
+      "title": "Wind Speed Peak",
+      "description": "Maximum recorder wind speed.",
+      "unit": "Km/h"
+    }
+  },
+  "required": [
+    "autoParkThreshold",
+    "humidity",
+    "pressure",
+    "temperature",
+    "timestamp",
+    "windDirection",
+    "windSpeed",
+    "windSpeedPeak"
+  ]
+}

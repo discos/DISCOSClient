@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "status.json",
   "title": "System status",
-  "description": "Operational status of the system.",
+  "description": "Operational status of the given system.",
   "type": "string",
   "enum": ["OK", "WARNING", "FAILURE"]
 }

@@ -125,8 +125,13 @@ class SchemaMerger:
             for f in definitions_dir.iterdir():
                 if f.is_file() and f.name.endswith(".json"):
                     schema = json.loads(f.read_text(encoding="utf-8"))
-                    self.__absolutize_refs(schema, f.name)
-                    definitions[f"definitions/{f.name}"] = schema
+                    self.__absolutize_refs(
+                        schema,
+                        f.relative_to(base_dir).as_posix()
+                    )
+                    definitions[
+                        f"{f.relative_to(base_dir).as_posix()}"
+                    ] = schema
         else:
             raise FileNotFoundError(f"{definitions_dir} not found.")
         for d in schemas_dirs:
@@ -134,10 +139,15 @@ class SchemaMerger:
                 if f.is_file() and f.name.endswith(".json"):
                     key = f.stem
                     schema = json.loads(f.read_text(encoding="utf-8"))
-                    self.__absolutize_refs(schema, f.name)
+                    self.__absolutize_refs(
+                        schema,
+                        f.relative_to(base_dir).as_posix()
+                    )
                     schemas[key] = schema
                     for k, v in schema.get("$defs", {}).items():
-                        definitions[f"{f.name}#/$defs/{k}"] = v
+                        definitions[
+                            f"{f.relative_to(base_dir).as_posix()}#/$defs/{k}"
+                        ] = v
         return schemas, definitions
 
     def merge_schema(

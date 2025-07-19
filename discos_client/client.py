@@ -241,7 +241,8 @@ with optional indentation level <n> (default is 2)
             default=default,
             indent=indent,
             separators=separators,
-            sort_keys=True
+            sort_keys=True,
+            ensure_ascii=False
         )
 
     def __public_dict__(self) -> dict[str, DISCOSNamespace]:

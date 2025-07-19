@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "common/receivers.json",
-  "title": "receivers",
+  "title": "Receivers status",
   "type": "object",
   "description": "Status of the telescope receivers.",
   "$defs": {
@@ -11,7 +11,8 @@
         "boss": {
           "type": "object",
           "title": "Receivers Boss",
-          "description": "Status of the Receivers Boss component.",
+          "description": "Status of the DISCOS ReceiversBoss component.",
+          "node": "receivers.boss",
           "properties": {
             "currentReceiver": {
               "type": "string",
@@ -47,7 +48,8 @@
         "^(?!boss$).*": {
           "type": "object",
           "title": "Receiver status",
-          "description": "Status of the receiver.",
+          "description": "Status of a receiver component.",
+          "node": "receivers.<receiverName>",
           "properties": {
             "cryoTemperatureCoolHead": {
               "type": "number",
@@ -84,12 +86,12 @@
               "title": "Operative mode",
               "description": "Name of the current receiver operative mode."
             },
-            "sections": {
+            "channels": {
               "type": "array",
-              "title": "Sections",
-              "description": "List of receiver's sections.",
+              "title": "Channels",
+              "description": "List of receiver's channelss.",
               "items": {
-                "$ref": "#/$defs/section"
+                "$ref": "common/receivers.json#/$defs/channel"
               }
             },
             "status": {
@@ -102,7 +104,7 @@
               "type": "number",
               "title": "Vacuum",
               "description": "Dewar vacuum.",
-              "unit": "pressure"
+              "unit": "mbar"
             }
           },
           "required": [
@@ -112,7 +114,7 @@
             "cryoTemperatureLNAWindow",
             "environmentTemperature",
             "operativeMode",
-            "sections",
+            "channels",
             "status",
             "timestamp",
             "vacuum"
@@ -123,20 +125,20 @@
       "maxProperties": 1,
       "additionalProperties": false
     },
-    "section": {
+    "channel": {
       "type": "object",
-      "title": "Section",
-      "description": "Receiver section.",
+      "title": "Channel",
+      "description": "Single receiver channel.",
       "properties": {
         "id": {
           "type": "number",
-          "title": "Section ID",
-          "description": "Section ID number."
+          "title": "Channel ID",
+          "description": "Channel ID number."
         },
         "localOscillator": {
           "type": "number",
           "title": "Local Oscillator Frequency",
-          "description": "Section Local Oscillator frequency.",
+          "description": "Channel Local Oscillator frequency.",
           "unit": "MHz"
         },
         "startFrequency": {
@@ -154,7 +156,7 @@
         "polarization": {
           "type": "string",
           "title": "Polarization",
-          "description": "Section polarization.",
+          "description": "Channel polarization.",
           "enum": [
             "LHCP",
             "RHCP"
@@ -171,7 +173,7 @@
     }
   },
   "oneOf": [
-    { "$ref": "#/$defs/boss" },
-    { "$ref": "#/$defs/receiver" }
+    { "$ref": "common/receivers.json#/$defs/boss" },
+    { "$ref": "common/receivers.json#/$defs/receiver" }
   ]
 }

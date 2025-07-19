@@ -1,0 +1,43 @@
+{
+  "title": "Generic schema metadata",
+  "description": "Common metadata fields used in all schema definitions.",
+  "properties": {
+    "node": {
+      "type": "string",
+      "description": "Dot notation path in the DISCOSClient namespace (e.g., 'antenna.observedAzimuth', 'mount.elevation.currentPosition')"
+    },
+    "title": {
+      "type": "string",
+      "description": "Short human-readable title for the property."
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the property."
+    },
+    "unit": {
+      "type": "string",
+      "description": "Physical unit of measure (e.g., %, degrees, m/s)."
+    },
+    "type": {
+      "type": "string",
+      "description": "JSON Schema type of the value (e.g., number, integer, string)."
+    },
+    "format": {
+      "type": "string",
+      "description": "Optional JSON Schema format annotation (e.g., int64, date-time)."
+    },
+    "enum": {
+      "type": "string",
+      "description": "Indicates that the property can only assume specific values among the listed ones."
+    }
+  },
+  "required": [
+    "node",
+    "title",
+    "description",
+    "unit",
+    "type",
+    "format",
+    "enum"
+  ]
+}

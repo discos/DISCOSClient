@@ -1,8 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "title": "Mount status",
-  "description": "Status of the antenna mount.",
+  "title": "SRT Mount",
+  "description": "Status of the SRT DISCOS Mount component.",
+  "node": "mount",
   "$defs": {
     "axis_status": {
       "type": "object",
@@ -47,7 +48,7 @@
             "STANDBY",
             "STOP",
             "PRESET",
-            "PROGRAMTRACK",
+            "PROGRAM TRACK",
             "RATE",
             "STOW",
             "UNSTOW",
@@ -142,7 +143,7 @@
           "title": "Motors",
           "description": "List of motor statuses.",
           "items": {
-            "$ref": "#/$defs/motor"
+            "$ref": "srt/mount.json#/$defs/motor"
           }
         }
       },
@@ -322,7 +323,7 @@
       "title": "Azimuth axis status",
       "description": "Azimuth axis status of the antenna mount.",
       "allOf": [
-        { "$ref": "#/$defs/axis_status" }
+        { "$ref": "srt/mount.json#/$defs/axis_status" }
       ]
     },
     "elevation": {
@@ -330,7 +331,7 @@
       "title": "Elevation axis status",
       "description": "Elevation axis status of the antenna mount.",
       "allOf": [
-        { "$ref": "#/$defs/axis_status" }
+        { "$ref": "srt/mount.json#/$defs/axis_status" }
       ]
     },
     "cableWrap": {
@@ -361,7 +362,7 @@
           "title": "Motors",
           "description": "List of motor statuses.",
           "items": {
-            "$ref": "#/$defs/motor"
+            "$ref": "srt/mount.json#/$defs/motor"
           }
         }
       },

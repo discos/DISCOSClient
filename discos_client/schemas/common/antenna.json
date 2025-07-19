@@ -1,9 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "common/antenna.json",
-  "title": "antenna",
+  "title": "Antenna Boss",
   "type": "object",
-  "description": "Status of the antenna boss.",
+  "description": "This schema is sent by the DISCOS AntennaBoss component. It holds valueable info regarding the antenna pointing, the currently pointed target, as well as some other additional information.",
+  "node": "antenna",
   "properties": {
     "FWHM": {
       "type": "number",
@@ -43,7 +44,7 @@
         "SUN",
         "MOON",
         "SATELLITE",
-        "SOLARSYSTEMBODY",
+        "SOLAR SYSTEM BODY",
         "OTF",
         "NONE"
       ]
@@ -132,6 +133,92 @@
       "description": "Offset applied to right ascension.",
       "unit": "degrees"
     },
+    "site": {
+      "type": "object",
+      "title": "Site",
+      "description": "Geodetic and timing metadata for the antenna site.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Site name",
+          "description": "Name of the site/observatory.",
+          "enum": ["Medicina", "Noto", "SRT"]
+        },
+        "longitude": {
+          "type": "number",
+          "title": "Longitude",
+          "description": "Longitude of the site, in degrees east of Greenwich.",
+          "unit": "degrees"
+        },
+        "latitude": {
+          "type": "number",
+          "title": "Latitude",
+          "description": "Latitude of the site, in degrees north of the equator.",
+          "unit": "degrees"
+        },
+        "height": {
+          "type": "number",
+          "title": "Height",
+          "description": "Geodetic height of the site above the reference ellipsoid.",
+          "unit": "meters"
+        },
+        "xPosition": {
+          "type": "number",
+          "title": "ECEF X Position",
+          "description": "X coordinate in the Earth-Centered Earth-Fixed (ECEF) reference frame. X=0 lies in the plane of the Greenwich meridian.",
+          "unit": "meters"
+        },
+        "yPosition": {
+          "type": "number",
+          "title": "ECEF Y Position",
+          "description": "Y coordinate in the ECEF frame. Y=0 lies in the plane of the meridian 90° east of Greenwich.",
+          "unit": "meters"
+        },
+        "zPosition": {
+          "type": "number",
+          "title": "ECEF Z Position",
+          "description": "Z coordinate in the ECEF frame. Z=0 lies in the plane of the equator.",
+          "unit": "meters"
+        },
+        "xPolarMotion": {
+          "type": "number",
+          "title": "X Polar Motion",
+          "description": "X component of the Earth's polar motion (xp), in arcseconds.",
+          "unit": "arcseconds"
+        },
+        "yPolarMotion": {
+          "type": "number",
+          "title": "Y Polar Motion",
+          "description": "Y component of the Earth's polar motion (yp), in arcseconds.",
+          "unit": "arcseconds"
+        },
+        "DUT1": {
+          "type": "number",
+          "title": "DUT1",
+          "description": "Difference between UT1 and UTC (DUT1 = UT1 - UTC).",
+          "unit": "seconds"
+        },
+        "ellipsoid": {
+          "type": "string",
+          "title": "Ellipsoid Model",
+          "description": "Geodetic reference ellipsoid used for position and height calculations.",
+          "enum": ["WGS84", "GRS80", "MERIT83", "OSU91A", "SOVIET85"]
+        }
+      },
+      "required": [
+        "name",
+        "longitude",
+        "latitude",
+        "height",
+        "xPosition",
+        "yPosition",
+        "zPosition",
+        "xPolarMotion",
+        "yPolarMotion",
+        "ellipsoid",
+        "DUT1"
+      ]
+    },
     "status": {
       "$ref": "definitions/status.json"
     },
@@ -190,10 +277,10 @@
       "enum": [
         "TOPOCENTRIC",
         "BARYCENTRIC",
-        "KINEMATICLOCALSTANDARDOFREST",
-        "DYNAMICLOCALSTANDARDOFREST",
-        "GALACTICCENTER",
-        "LOCALGROUP",
+        "KINEMATIC LOCAL STANDARD OF REST",
+        "DYNAMIC LOCAL STANDARD OF REST",
+        "GALACTIC CENTER",
+        "LOCAL GROUP",
         "UNDEFINED"
       ]
     },
@@ -225,6 +312,7 @@
     "rawElevation",
     "refractionCorrection",
     "rightAscensionOffset",
+    "site",
     "status",
     "target",
     "targetDeclination",

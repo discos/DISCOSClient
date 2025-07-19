@@ -1,14 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "timestamp.json",
-  "title": "Timestamps",
-  "description": "Collection of timestamp representations for the data sample.",
+  "title": "Timestamp",
+  "description": "Collection of timestamp representations for the given message.",
   "type": "object",
   "properties": {
-    "omg": {
+    "omg_time": {
       "type": "integer",
       "title": "Object Management Group Time",
-      "description": "Elapsed time since the OMG epoch (1582-10-15T00:00:00.000Z).",
+      "description": "Timestamp expressed as the number of 100-nanosecond intervals since the OMG/DCE epoch: 1582-10-15T00:00:00:000Z. This representation is used in the X/Open DCE Time Service and supports a wide temporal range with high resolution.",
       "unit": "100ns"
     },
     "iso8601": {
@@ -16,12 +16,6 @@
       "title": "ISO 8601",
       "description": "Full ISO 8601 timestamp.",
       "format": "date-time"
-    },
-    "jd": {
-      "type": "number",
-      "title": "Julian Date",
-      "description": "Continuous Julian Date.",
-      "unit": "days"
     },
     "mjd": {
       "type": "number",
@@ -36,5 +30,5 @@
       "unit": "seconds"
     }
   },
-  "required": ["omg", "iso8601", "jd", "mjd", "unix_time"]
+  "required": ["omg_time", "iso8601", "mjd", "unix_time"]
 }
