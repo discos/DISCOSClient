@@ -1,18 +1,18 @@
 from __future__ import annotations
+import re
 import json
 import operator
 from typing import Any, Callable, TYPE_CHECKING
 from importlib.resources import files
-from pathlib import Path
+
 
 if TYPE_CHECKING:  # pragma: no cover
     from .namespace import DISCOSNamespace
 
 __all__ = [
     "delegated_operations",
-    "load_schemas",
-    "merge_schema",
-    "public_dict"
+    "public_dict",
+    "SchemaMerger"
 ]
 
 
@@ -41,20 +41,6 @@ def delegated_operations(handler: str) -> Callable[[type], type]:
             setattr(cls, method_name, make_method(op))
         return cls
     return decorator
-
-
-def load_schemas(telescope: str | None) -> dict[str, dict]:
-    base_dir = files("discos_client") / "schemas"
-    schemas_dirs = [base_dir / "common"]
-    if telescope:
-        schemas_dirs.append(base_dir / telescope.lower())
-    schemas = {}
-    for d in schemas_dirs:
-        for f in d.iterdir():
-            if f.is_file() and f.name.endswith(".json"):
-                key = Path(f.name).stem
-                schemas[key] = json.loads(f.read_text())
-    return schemas
 
 
 def public_dict(
@@ -108,97 +94,251 @@ def __unwrap_enum(value: Any, is_fn, get_value_fn) -> Any:
     return list(value) if isinstance(value, (list, tuple)) else value
 
 
-def merge_schema(
-    schema: dict[str, Any],
-    message: dict[str, Any]
-) -> dict[str, Any]:
-    enriched = __enrich_properties(schema["properties"], message, schema)
-    return {
-        **{
-            k: v for k, v in schema.items()
-            if k in ("title", "type", "description")
-        },
-        **enriched
-    }
+class SchemaMerger:
+    def __init__(self, telescope: str | None):
+        self.schemas, self.definitions = self.__load_schemas(telescope)
 
+    @staticmethod
+    def __absolutize_refs(obj, filename):
+        if isinstance(obj, dict):
+            if "$ref" in obj and obj["$ref"].startswith("#/$defs/"):
+                obj["$ref"] = f"{filename}{obj['$ref']}"
+            for v in obj.values():
+                SchemaMerger.__absolutize_refs(v, filename)
+        elif isinstance(obj, list):
+            for item in obj:
+                SchemaMerger.__absolutize_refs(item, filename)
 
-def __enrich_properties(
-    properties: dict[str, Any],
-    values: dict[str, Any],
-    root_schema: dict[str, Any]
-) -> dict[str, Any]:
-    result = {}
-    for key, prop_schema in properties.items():
-        prop_schema = __expand_allof(prop_schema, root_schema)
-        if "$ref" in prop_schema:
-            resolved = __resolve_ref(prop_schema["$ref"], root_schema)
-            prop_schema = {
-                **{k: v for k, v in prop_schema.items() if k != "$ref"},
-                **resolved
-            }
+    def __load_schemas(
+        self,
+        telescope: str | None
+    ) -> tuple[dict[str, dict], dict[str, dict]]:
+        base_dir = files("discos_client") / "schemas"
+        schemas_dirs = [base_dir / "common"]
+        if telescope:
+            schemas_dirs.append(base_dir / telescope.lower())
+        schemas = {}
+        definitions = {}
+
+        definitions_dir = base_dir / "definitions"
+        if definitions_dir.exists():
+            for f in definitions_dir.iterdir():
+                if f.is_file() and f.name.endswith(".json"):
+                    schema = json.loads(f.read_text(encoding="utf-8"))
+                    self.__absolutize_refs(
+                        schema,
+                        f.relative_to(base_dir).as_posix()
+                    )
+                    definitions[
+                        f"{f.relative_to(base_dir).as_posix()}"
+                    ] = schema
+        else:
+            raise FileNotFoundError(f"{definitions_dir} not found.")
+        for d in schemas_dirs:
+            for f in d.iterdir():
+                if f.is_file() and f.name.endswith(".json"):
+                    key = f.stem
+                    schema = json.loads(f.read_text(encoding="utf-8"))
+                    self.__absolutize_refs(
+                        schema,
+                        f.relative_to(base_dir).as_posix()
+                    )
+                    schemas[key] = schema
+                    for k, v in schema.get("$defs", {}).items():
+                        definitions[
+                            f"{f.relative_to(base_dir).as_posix()}#/$defs/{k}"
+                        ] = v
+        return schemas, definitions
+
+    def merge_schema(
+        self,
+        name: str,
+        message: dict[str, Any]
+    ) -> dict[str, Any]:
+        if name not in self.schemas:
+            raise ValueError(f"Schema '{name}' was not loaded.")
+        schema = self.schemas[name]
+        expanded = self.__expand_all_refs(schema)
+        enriched = self.__expand_schema_keywords(expanded, message)
+        enriched = self.__enrich_properties(
+            enriched.get("properties", {}),
+            message,
+            enriched,
+            enriched.get("patternProperties", {})
+        )
+        return {
+            **{
+                k: v
+                for k, v in enriched.items()
+                if k in ("title", "type", "description")
+            },
+            **enriched
+        }
+
+    def __expand_all_refs(self, obj: Any) -> Any:
+        if isinstance(obj, dict):
+            if "$ref" in obj:
+                ref = obj["$ref"]
+                resolved = self.definitions.get(ref)
+                if not resolved:
+                    raise ValueError(f"Unresolved $ref: {ref}")
+                return self.__expand_all_refs({
+                    **resolved,
+                    **{k: v for k, v in obj.items() if k != "$ref"}
+                })
+            return {k: self.__expand_all_refs(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [self.__expand_all_refs(item) for item in obj]
+        return obj
+
+    def __expand_schema_keywords(
+        self,
+        obj: dict[str, Any],
+        root_schema: dict[str, Any]
+    ) -> dict[str, Any]:
+        if "allOf" in obj:
+            result = {}
+            for item in obj["allOf"]:
+                result.update(item)
+            return {**result, **{k: v for k, v in obj.items() if k != "allOf"}}
+        if "oneOf" in obj:
+            data = root_schema
+            for candidate in obj["oneOf"]:
+                props = set(candidate.get("properties", {}).keys())
+                patterns = candidate.get("patternProperties", {})
+                min_p = candidate.get("minProperties", 0)
+                max_p = candidate.get("maxProperties", float("inf"))
+                add_ok = candidate.get("additionalProperties", True)
+                keys = set(data.keys())
+                if not min_p <= len(keys) <= max_p:
+                    continue
+                if not add_ok and props:
+                    if any(k not in props and
+                            not any(re.fullmatch(p, k) for p in patterns)
+                            for k in keys):
+                        continue
+                if props and not props.issuperset(keys) and not patterns:
+                    continue
+                return candidate
+            raise ValueError("No matching schema in oneOf")
+        return obj
+
+    def __enrich_properties(
+        self,
+        properties: dict[str, Any],
+        values: dict[str, Any],
+        root_schema: dict[str, Any],
+        pattern_properties: dict[str, Any] = None
+    ) -> dict[str, Any]:
+        result = {}
+        for key, prop_schema in properties.items():
+            expanded = self.__expand_schema_keywords(prop_schema, root_schema)
+            result[key] = self.__enrich_named_property(
+                key,
+                expanded,
+                values,
+                root_schema
+            )
+        result.update(self.__enrich_pattern_properties(
+            pattern_properties or {},
+            properties,
+            values,
+            root_schema)
+        )
+        return result
+
+    def __enrich_named_property(
+        self,
+        key: str,
+        prop_schema: dict[str, Any],
+        values: dict[str, Any],
+        root_schema: dict[str, Any]
+    ) -> dict[str, Any]:
+        prop_schema = self.__expand_schema_keywords(prop_schema, root_schema)
         value = values.get(key, None)
         if prop_schema.get("type") == "object" and "properties" in prop_schema:
             nested_values = value if isinstance(value, dict) else {}
-            nested = __enrich_properties(
+            nested = self.__enrich_properties(
                 prop_schema["properties"],
                 nested_values,
-                root_schema
+                root_schema,
+                prop_schema.get("patternProperties", {})
             )
-            enriched = {
+            return {
                 **{
-                    k: v for k, v in prop_schema.items()
+                    k: v
+                    for k, v in prop_schema.items()
                     if k in ("type", "title", "description")
                 },
                 **nested
             }
-        elif prop_schema.get("type") == "array":
-            raw_item_schema = prop_schema.get("items", {})
-            if "$ref" in raw_item_schema:
-                resolved = __resolve_ref(raw_item_schema["$ref"], root_schema)
-                item_schema = {
-                    **resolved,
-                    **{k: v for k, v in raw_item_schema.items() if k != "$ref"}
-                }
-            else:
-                item_schema = raw_item_schema
+        if prop_schema.get("type") == "array":
+            item_schema = self.__expand_schema_keywords(
+                prop_schema.get("items", {}),
+                root_schema
+            )
             item_metadata = {
-                k: v for k, v in item_schema.items()
+                k: v
+                for k, v in item_schema.items()
                 if k in ("type", "title", "description")
             }
-            enriched = dict(prop_schema)
-            enriched["value"] = [
-                {
-                    **item_metadata,
-                    **__enrich_properties(
-                        item_schema.get("properties", {}), v, root_schema
-                    )
-                } if isinstance(v, dict) else {"value": v}
-                for v in value
-            ] if isinstance(value, list) else []
-        else:
-            enriched = dict(prop_schema)
-            enriched["value"] = value
-        result[key] = enriched
-    return result
+            return {
+                **{k: v for k, v in prop_schema.items() if k != "items"},
+                "value": [
+                    {
+                        **item_metadata,
+                        **self.__enrich_properties(
+                            item_schema.get("properties", {}),
+                            v,
+                            root_schema,
+                            item_schema.get("patternProperties", {})
+                        )
+                    } if isinstance(v, dict) else {"value": v}
+                    for v in value
+                ] if isinstance(value, list) else []
+            }
+        enriched = dict(prop_schema)
+        enriched["value"] = value
+        return enriched
 
-
-def __expand_allof(
-    obj: dict[str, Any],
-    root_schema: dict[str, Any]
-) -> dict[str, Any]:
-    if "allOf" in obj:
+    def __enrich_pattern_properties(
+        self,
+        pattern_properties: dict[str, Any],
+        defined_properties: dict[str, Any],
+        values: dict[str, Any],
+        root_schema: dict[str, Any]
+    ) -> dict[str, Any]:
         result = {}
-        for item in obj["allOf"]:
-            if "$ref" in item:
-                result.update(__resolve_ref(item["$ref"], root_schema))
-            else:
-                result.update(item)
-        return {**result, **{k: v for k, v in obj.items() if k != "allOf"}}
-    return obj
+        for pattern, pattern_schema in pattern_properties.items():
+            regex = re.compile(pattern)
+            for key in values:
+                if key in defined_properties or not regex.match(key):
+                    continue
+                schema = self.__expand_schema_keywords(
+                    pattern_schema,
+                    root_schema
+                )
+                value = values[key]
+                if schema.get("type") == "object" and "properties" in schema:
+                    nested_values = value if isinstance(value, dict) else {}
+                    nested = self.__enrich_properties(
+                        schema["properties"],
+                        nested_values,
+                        root_schema,
+                        schema.get("patternProperties", {})
+                    )
+                    enriched = {
+                        **{
+                            k: v for k, v in schema.items()
+                            if k in ("type", "title", "description")
+                        },
+                        **nested
+                    }
+                else:
+                    enriched = dict(schema)
+                    enriched["value"] = value
+                result[key] = enriched
+        return result
 
-
-def __resolve_ref(ref: str, root_schema: dict[str, Any]) -> dict[str, Any]:
-    if ref.startswith("#/$defs/"):
-        def_key = ref.split("/")[-1]
-        return root_schema.get("$defs", {}).get(def_key, {})
-    raise ValueError(f"Unsupported $ref format: {ref}")
+    def get_topics(self) -> list[str]:
+        return list(self.schemas.keys())

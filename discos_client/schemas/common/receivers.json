@@ -1,0 +1,179 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "common/receivers.json",
+  "title": "Receivers status",
+  "type": "object",
+  "description": "Status of the telescope receivers.",
+  "$defs": {
+    "boss": {
+      "type": "object",
+      "properties": {
+        "boss": {
+          "type": "object",
+          "title": "Receivers Boss",
+          "description": "Status of the DISCOS ReceiversBoss component.",
+          "node": "receivers.boss",
+          "properties": {
+            "currentReceiver": {
+              "type": "string",
+              "title": "Current Receiver",
+              "description": "Currently selected receiver's name."
+            },
+            "currentSetup": {
+              "type": "string",
+              "title": "Current setup",
+              "description": "Current DISCOS setup code"
+            },
+            "status": {
+              "$ref": "definitions/status.json"
+            },
+            "timestamp": {
+              "$ref": "definitions/timestamp.json"
+            }
+          },
+          "required": [
+            "currentReceiver",
+            "currentSetup",
+            "status",
+            "timestamp"
+          ]
+        }
+      },
+      "required": ["boss"],
+      "additionalProperties": false
+    },
+    "receiver": {
+      "type": "object",
+      "patternProperties": {
+        "^(?!boss$).*": {
+          "type": "object",
+          "title": "Receiver status",
+          "description": "Status of a receiver component.",
+          "node": "receivers.<receiverName>",
+          "properties": {
+            "cryoTemperatureCoolHead": {
+              "type": "number",
+              "title": "Cryo temperature cool head",
+              "description": "Cryogenic temperature of receiver's cool head",
+              "unit": "K"
+            },
+            "cryoTemperatureCoolHeadWindow": {
+              "type": "number",
+              "title": "Cryo temperature cool head window",
+              "description": "Cryogenic temperature of receiver's cool head, window sensor",
+              "unit": "K"
+            },
+            "cryoTemperatureLNA": {
+              "type": "number",
+              "title": "Cryo temperature LNAs",
+              "description": "Cryogenic temperature of receiver's LNAs",
+              "unit": "K"
+            },
+            "cryoTemperatureLNAWindow": {
+              "type": "number",
+              "title": "Cryo temperature LNAs window",
+              "description": "Cryogenic temperature of receiver's LNAs, window sensor",
+              "unit": "K"
+            },
+            "environmentTemperature": {
+              "type": "number",
+              "title": "Environment temperature",
+              "description": "Environment temperature.",
+              "unit": "°C"
+            },
+            "operativeMode": {
+              "type": "string",
+              "title": "Operative mode",
+              "description": "Name of the current receiver operative mode."
+            },
+            "channels": {
+              "type": "array",
+              "title": "Channels",
+              "description": "List of receiver's channelss.",
+              "items": {
+                "$ref": "common/receivers.json#/$defs/channel"
+              }
+            },
+            "status": {
+              "$ref": "definitions/status.json"
+            },
+            "timestamp": {
+              "$ref": "definitions/timestamp.json"
+            },
+            "vacuum": {
+              "type": "number",
+              "title": "Vacuum",
+              "description": "Dewar vacuum.",
+              "unit": "mbar"
+            }
+          },
+          "required": [
+            "cryoTemperatureCoolHead",
+            "cryoTemperatureCoolHeadWindow",
+            "cryoTemperatureLNA",
+            "cryoTemperatureLNAWindow",
+            "environmentTemperature",
+            "operativeMode",
+            "channels",
+            "status",
+            "timestamp",
+            "vacuum"
+          ]
+        }
+      },
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false
+    },
+    "channel": {
+      "type": "object",
+      "title": "Channel",
+      "description": "Single receiver channel.",
+      "properties": {
+        "id": {
+          "type": "number",
+          "title": "Channel ID",
+          "description": "Channel ID number."
+        },
+        "localOscillator": {
+          "type": "number",
+          "title": "Local Oscillator Frequency",
+          "description": "Channel Local Oscillator frequency.",
+          "unit": "MHz"
+        },
+        "startFrequency": {
+          "type": "number",
+          "title": "Starting frequency",
+          "description": "Starting observing frequency.",
+          "unit": "MHz"
+        },
+        "bandWidth": {
+          "type": "number",
+          "title": "BandWidth",
+          "description": "Observing bandwidth.",
+          "unit": "MHz"
+        },
+        "polarization": {
+          "type": "string",
+          "title": "Polarization",
+          "description": "Channel polarization.",
+          "enum": [
+            "LHCP",
+            "RHCP"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "localOscillator",
+        "startFrequency",
+        "bandWidth",
+        "polarization"
+      ]
+    }
+  },
+  "oneOf": [
+    { "$ref": "common/receivers.json#/$defs/boss" },
+    { "$ref": "common/receivers.json#/$defs/receiver" }
+  ]
+}

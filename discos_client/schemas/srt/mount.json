@@ -1,8 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "title": "Mount status",
-  "description": "Status of the antenna mount.",
+  "title": "SRT Mount",
+  "description": "Status of the SRT DISCOS Mount component.",
+  "node": "mount",
   "$defs": {
     "axis_status": {
       "type": "object",
@@ -47,7 +48,7 @@
             "STANDBY",
             "STOP",
             "PRESET",
-            "PROGRAMTRACK",
+            "PROGRAM TRACK",
             "RATE",
             "STOW",
             "UNSTOW",
@@ -142,7 +143,7 @@
           "title": "Motors",
           "description": "List of motor statuses.",
           "items": {
-            "$ref": "#/$defs/motor"
+            "$ref": "srt/mount.json#/$defs/motor"
           }
         }
       },
@@ -315,21 +316,14 @@
       "description": "Status socket status."
     },
     "status": {
-      "type": "string",
-      "title": "Mount component status",
-      "description": "Overall status of the mount system.",
-      "enum": [
-        "OK",
-        "WARNING",
-        "FAILURE"
-      ]
+      "$ref": "definitions/status.json"
     },
     "azimuth": {
       "type": "object",
       "title": "Azimuth axis status",
       "description": "Azimuth axis status of the antenna mount.",
       "allOf": [
-        { "$ref": "#/$defs/axis_status" }
+        { "$ref": "srt/mount.json#/$defs/axis_status" }
       ]
     },
     "elevation": {
@@ -337,7 +331,7 @@
       "title": "Elevation axis status",
       "description": "Elevation axis status of the antenna mount.",
       "allOf": [
-        { "$ref": "#/$defs/axis_status" }
+        { "$ref": "srt/mount.json#/$defs/axis_status" }
       ]
     },
     "cableWrap": {
@@ -368,7 +362,7 @@
           "title": "Motors",
           "description": "List of motor statuses.",
           "items": {
-            "$ref": "#/$defs/motor"
+            "$ref": "srt/mount.json#/$defs/motor"
           }
         }
       },
@@ -426,48 +420,7 @@
       ]
     },
     "timestamp": {
-      "type": "object",
-      "title": "Timestamps",
-      "description": "Collection of timestamp representations for the data sample.",
-      "properties": {
-        "iso8601": {
-          "type": "string",
-          "title": "ISO 8601",
-          "description": "Full ISO 8601 timestamp.",
-          "format": "date-time"
-        },
-        "jd": {
-          "type": "number",
-          "title": "Julian Date",
-          "description": "Continuous Julian Date.",
-          "unit": "days"
-        },
-        "mjd": {
-          "type": "number",
-          "title": "Modified Julian Date",
-          "description": "Modified Julian Date.",
-          "unit": "days"
-        },
-        "omg": {
-          "type": "integer",
-          "title": "Object Management Group Time",
-          "description": "Elapsed time since the OMG epoch (1582-10-15T00:00:00.000Z).",
-          "unit": "100ns"
-        },
-        "unix_time": {
-          "type": "number",
-          "title": "UNIX Time",
-          "description": "Elapsed time measured in seconds since the UNIX epoch at 1970-01-01T00:00:00 UTC.",
-          "unit": "seconds"
-        }
-      },
-      "required": [
-        "iso8601",
-        "jd",
-        "mjd",
-        "omg",
-        "unix_time"
-      ]
+      "$ref": "definitions/timestamp.json"
     }
   },
   "required": [
