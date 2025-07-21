@@ -280,7 +280,6 @@ class SchemaMerger:
         values: dict[str, Any],
     ) -> dict[str, Any]:
         properties = schema.get("properties", {})
-        pattern_properties = schema.get("patternProperties", {})
         required = set(schema.get("required", []))
         result = {}
         for key, prop_schema in properties.items():
@@ -346,7 +345,7 @@ class SchemaMerger:
         defined_properties = schema.get("properties", {})
         for pattern, pattern_schema in pattern_properties.items():
             regex = re.compile(pattern)
-            for key, value in values.items():
+            for key, _ in values.items():
                 if key in defined_properties or not regex.match(key):
                     continue
                 result[key] = self.__enrich_named_property(
