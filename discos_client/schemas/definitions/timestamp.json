@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "timestamp.json",
+  "$id": "definitions/timestamp.json",
   "title": "Timestamp",
   "description": "Collection of timestamp representations for the given message.",
   "type": "object",

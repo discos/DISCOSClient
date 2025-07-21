@@ -86,6 +86,9 @@ def _complexstructures(self, schema):
 
 
 def _reference(self, schema):
+    if schema['$ref'].startswith('#'):
+        schema['$ref'] = f"{self.filename}{schema['$ref']}"
+
     if self.options['auto_reference'] and self.options['lift_title']:
         # first check if references is to own schema
         # when definitions is separated automated they will be linked to the title
@@ -94,12 +97,8 @@ def _reference(self, schema):
             self._get_defined_reference(schema, 'definitions') or
             self._get_defined_reference(schema, '$defs')
         )
-        if schema['$ref'] == '#' or schema['$ref'] == '#/':
-            if self.ref_titles.get(0, False):
-                row = (self._line(self._cell('`' + self.ref_titles[0] + '`_')))
-            else:
-                row = (self._line(self._cell(schema['$ref'])))
-        elif reference:
+
+        if reference:
             ref_length, target_name = reference
             # Check if there are definitions available to make a reference
             if (self.ref_titles.get(ref_length, False) and
@@ -108,9 +107,6 @@ def _reference(self, schema):
                 row = (self._line(self._cell('`' + ref_title + '`_')))
             else:
                 row = (self._line(self._cell(schema['$ref'])))
-        elif schema['$ref'].startswith("#/"):
-            # Other references to own schema should not be defined as :ref: only as string
-            row = (self._line(self._cell(schema['$ref'])))
         elif schema['$ref'].startswith("http"):
             row = (self._line(self._cell(schema['$ref'])))
         elif "#/" in schema['$ref']:

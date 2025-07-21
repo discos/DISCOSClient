@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from threading import Thread, Event
 import zmq
-from discos_client import SRTClient
+from discos_client import DISCOSClient
 from discos_client.namespace import DISCOSNamespace
 
 
@@ -16,20 +16,20 @@ class TestPublisher:
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.XPUB)
         self.socket.setsockopt(zmq.SNDHWM, 2)
-        self.socket.bind(f'tcp://127.0.0.1:{self.PORT}')
+        self.socket.bind(f"tcp://127.0.0.1:{self.PORT}")
         messages_dir = Path(__file__).resolve().parent
         message_files = messages_dir.glob("messages/*.json")
         self.messages = {}
         for message in message_files:
             with open(message, "r", encoding="utf-8") as f:
                 topic_name = message.stem
-                self.messages[topic_name] = json.dumps(
-                    json.load(f),
-                    separators=(",", ":")
-                )
+                self.messages[topic_name] = json.load(f)
         self.t = Thread(target=self.publish, daemon=True)
         self.event = Event()
         self.t.start()
+
+    def __enter__(self):
+        return self
 
     def _handle_subscription(self, poller):
         events = dict(poller.poll(100))
@@ -41,30 +41,36 @@ class TestPublisher:
             if "_" in topic:
                 t = topic.partition("_")[-1]
                 if t in self.messages:
+                    message = json.dumps(
+                        self.messages[t],
+                        separators=(',', ':')
+                    )
                     self.socket.send_string(
-                        f"{topic} {self.messages[t]}"
+                        f"{topic} {message}"
                     )
                 else:
                     subparts = {}
                     for key, val in self.messages.items():
                         if key.startswith(f"{t}."):
                             subkey = key[len(t) + 1:]
-                            subparts[subkey] = json.loads(val)
+                            subparts[subkey] = val
                     if subparts:
-                        merged = json.dumps(
+                        message = json.dumps(
                             subparts,
                             separators=(",", ":")
                         )
-                        self.socket.send_string(f"{topic} {merged}")
+                        self.socket.send_string(f"{topic} {message}")
 
     def _send_periodic_messages(self):
         for topic, payload in self.messages.items():
+            payload["timestamp"]["unix_time"] = time.time()
             if "." in topic:
                 topic, obj = topic.split(".", 1)
-                payload = json.dumps(
-                    {obj: json.loads(payload)},
-                    separators=(",", ":")
-                )
+                payload = {obj: payload}
+            payload = json.dumps(
+                payload,
+                separators=(",", ":")
+            )
             self.socket.send_string(f"{topic} {payload}")
 
     def publish(self):
@@ -73,8 +79,9 @@ class TestPublisher:
         while not self.event.is_set():
             self._handle_subscription(poller)
             self._send_periodic_messages()
+            time.sleep(0.1)
 
-    def close(self):
+    def __exit__(self, exc_type, exc_value, traceback):
         self.event.set()
         self.t.join()
         self.socket.close()
@@ -84,35 +91,43 @@ class TestPublisher:
 class TestBaseClient(unittest.TestCase):
 
     def test_no_topics(self):
-        SRTClient(address="127.0.0.1")
+        DISCOSClient(address="127.0.0.1", port=16000, telescope="SRT")
 
     def test_unknown_topic(self):
         with self.assertRaises(ValueError) as ex:
-            SRTClient("foo", address="127.0.0.1")
+            DISCOSClient(
+                "foo",
+                address="127.0.0.1",
+                port=16000
+            )
         self.assertTrue(
             "Topic 'foo' is not known" in ex.exception.args[0]
         )
         with self.assertRaises(ValueError) as ex:
-            SRTClient("foo", "bar", address="127.0.0.1")
+            DISCOSClient(
+                "foo", "bar",
+                address="127.0.0.1",
+                port=16000,
+            )
         self.assertTrue(
             "Topics 'foo' and 'bar' are not known" in ex.exception.args[0]
         )
 
     def test_repr(self):
-        client = SRTClient(address="127.0.0.1")
+        client = DISCOSClient(address="127.0.0.1", port=16000)
         self.assertTrue(
             repr(client).startswith("<DISCOSClient({") and
             repr(client).endswith("})>")
         )
 
     def test_str(self):
-        client = SRTClient(address="127.0.0.1")
+        client = DISCOSClient(address="127.0.0.1", port=16000)
         self.assertTrue(
             str(client).startswith("{") and str(client).endswith("}")
         )
 
     def test_format(self):
-        client = SRTClient(address="127.0.0.1")
+        client = DISCOSClient(address="127.0.0.1", port=16000)
         self.assertTrue(
             f"{client:}".startswith("{") and f"{client:}".endswith("}")
         )
@@ -148,59 +163,99 @@ class TestBaseClient(unittest.TestCase):
         )
         self.assertNotIn("\": ", f"{client:c}")
 
+    def test_bind(self):
+        with TestPublisher():
+            client = DISCOSClient(address="127.0.0.1", port=16000)
+            time.sleep(1)
+            s = set()
+            called = set()
+            s.add(id(client.antenna.timestamp.unix_time))
+            s.add(id(client.antenna))
+
+            def callback(value):
+                called.add(id(value))
+
+            client.antenna.timestamp.unix_time.bind(callback)
+            client.antenna.bind(callback)
+
+            while len(called) != 2:
+                time.sleep(0.1)
+
+            self.assertEqual(s, called)
+
+    def test_wait(self):
+        with TestPublisher():
+            client = DISCOSClient(address="127.0.0.1", port=16000)
+            time.sleep(1)
+            unix_time = client.antenna.timestamp.unix_time.copy()
+            antenna = client.antenna.copy()
+            self.assertNotEqual(
+                unix_time,
+                client.antenna.timestamp.unix_time.wait(timeout=2)
+            )
+            self.assertNotEqual(
+                antenna,
+                client.antenna.wait(timeout=2)
+            )
+
 
 class TestSyncClient(unittest.TestCase):
 
     def test_sync_client(self):
-        pub = TestPublisher()
-        time.sleep(1)
-        client = SRTClient("antenna", address="127.0.0.1")
-        antenna = client.get("antenna.timestamp", wait=True)
-        self.assertIsInstance(antenna, DISCOSNamespace)
-        antenna = client.get("antenna")
-        self.assertIsInstance(antenna, DISCOSNamespace)
-        with self.assertRaises(KeyError) as ex:
-            client.get("unknown")
-        self.assertEqual(
-            ex.exception.args[0],
-            "Unknown topic 'unknown'"
-        )
-        with self.assertRaises(KeyError) as ex:
-            client.get("mount")
-        self.assertEqual(
-            ex.exception.args[0],
-            "The client is not subscribed to 'mount'"
-        )
-        pub.close()
+        with TestPublisher():
+            client = DISCOSClient(
+                "antenna",
+                address="127.0.0.1",
+                port=16000,
+                telescope="SRT"
+            )
+            time.sleep(1)
+            antenna = client.get("antenna.timestamp", wait=True)
+            self.assertIsInstance(antenna, DISCOSNamespace)
+            antenna = client.get("antenna")
+            self.assertIsInstance(antenna, DISCOSNamespace)
+            with self.assertRaises(KeyError) as ex:
+                client.get("unknown")
+            self.assertEqual(
+                ex.exception.args[0],
+                "Unknown topic 'unknown'"
+            )
+            with self.assertRaises(KeyError) as ex:
+                client.get("mount")
+            self.assertEqual(
+                ex.exception.args[0],
+                "The client is not subscribed to 'mount'"
+            )
 
 
 class TestAsyncClient(unittest.IsolatedAsyncioTestCase):
 
     async def test_async_client(self):
-        pub = TestPublisher()
-        time.sleep(1)
-        client = SRTClient(
-            "antenna",
-            address="127.0.0.1",
-            asynchronous=True
-        )
-        antenna = await client.get("antenna.timestamp", wait=True)
-        self.assertIsInstance(antenna, DISCOSNamespace)
-        antenna = await client.get("antenna")
-        self.assertIsInstance(antenna, DISCOSNamespace)
-        with self.assertRaises(KeyError) as ex:
-            await client.get("unknown")
-        self.assertEqual(
-            ex.exception.args[0],
-            "Unknown topic 'unknown'"
-        )
-        with self.assertRaises(KeyError) as ex:
-            await client.get("mount")
-        self.assertEqual(
-            ex.exception.args[0],
-            "The client is not subscribed to 'mount'"
-        )
-        pub.close()
+        with TestPublisher():
+            client = DISCOSClient(
+                "antenna",
+                address="127.0.0.1",
+                port=16000,
+                telescope="SRT",
+                asynchronous=True
+            )
+            time.sleep(1)
+            antenna = await client.get("antenna.timestamp", wait=True)
+            self.assertIsInstance(antenna, DISCOSNamespace)
+            antenna = await client.get("antenna")
+            self.assertIsInstance(antenna, DISCOSNamespace)
+            with self.assertRaises(KeyError) as ex:
+                await client.get("unknown")
+            self.assertEqual(
+                ex.exception.args[0],
+                "Unknown topic 'unknown'"
+            )
+            with self.assertRaises(KeyError) as ex:
+                await client.get("mount")
+            self.assertEqual(
+                ex.exception.args[0],
+                "The client is not subscribed to 'mount'"
+            )
 
 
 if __name__ == '__main__':

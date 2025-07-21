@@ -4,6 +4,7 @@
   "title": "Receivers status",
   "type": "object",
   "description": "Status of the telescope receivers.",
+  "node": "receivers",
   "$defs": {
     "boss": {
       "type": "object",
@@ -25,10 +26,10 @@
               "description": "Current DISCOS setup code"
             },
             "status": {
-              "$ref": "definitions/status.json"
+              "$ref": "../definitions/status.json"
             },
             "timestamp": {
-              "$ref": "definitions/timestamp.json"
+              "$ref": "../definitions/timestamp.json"
             }
           },
           "required": [
@@ -91,14 +92,14 @@
               "title": "Channels",
               "description": "List of receiver's channelss.",
               "items": {
-                "$ref": "common/receivers.json#/$defs/channel"
+                "$ref": "#/$defs/channel"
               }
             },
             "status": {
-              "$ref": "definitions/status.json"
+              "$ref": "../definitions/status.json"
             },
             "timestamp": {
-              "$ref": "definitions/timestamp.json"
+              "$ref": "../definitions/timestamp.json"
             },
             "vacuum": {
               "type": "number",
@@ -172,8 +173,8 @@
       ]
     }
   },
-  "oneOf": [
-    { "$ref": "common/receivers.json#/$defs/boss" },
-    { "$ref": "common/receivers.json#/$defs/receiver" }
+  "anyOf": [
+    { "$ref": "#/$defs/boss" },
+    { "$ref": "#/$defs/receiver" }
   ]
 }

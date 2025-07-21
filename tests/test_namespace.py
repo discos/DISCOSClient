@@ -203,6 +203,7 @@ class TestDISCOSNamespace(unittest.TestCase):
         a = 2
         ns = DISCOSNamespace(value=a)
         self.assertEqual(ns + 2, 4)
+        self.assertEqual(2 + ns, 4)
         ns = DISCOSNamespace(a=a)
         with self.assertRaises(TypeError) as ex:
             _ = ns + 2
@@ -225,6 +226,15 @@ class TestDISCOSNamespace(unittest.TestCase):
         self.assertEqual(ns.a, "b")
         self.assertEqual(ns._a, "a")  # noqa
         self.assertFalse(ns is ns2)
+
+    def test_comparison(self):
+        a = 2
+        ns = DISCOSNamespace(value=a)
+        ns2 = DISCOSNamespace(value=a)
+        self.assertEqual(ns, a)
+        self.assertNotEqual(ns, a + 1)
+        self.assertFalse(ns < ns2)
+        self.assertFalse(ns > ns2)
 
 
 if __name__ == '__main__':

@@ -36,7 +36,8 @@ jsonschema_options = {
     'auto_reference': True,
     'auto_target': True,
     'lift_title': True,
-    'lift_description': True
+    'lift_description': True,
+    'lift_definitions': True,
 }
 
 templates_path = ['_templates']

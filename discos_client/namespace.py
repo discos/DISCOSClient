@@ -1,11 +1,16 @@
 from __future__ import annotations
 import json
+import threading
 from copy import deepcopy
 from typing import Any, Callable, Iterator
-from .utils import delegated_operations, public_dict
+from .utils import delegated_operations, delegated_comparisons, public_dict
+
+
+__all__ = ["DISCOSNamespace"]
 
 
 @delegated_operations('__value_operation__')
+@delegated_comparisons('__value_comparison__')
 class DISCOSNamespace:
     """
     Immutable recursive container for structured data.
@@ -16,6 +21,20 @@ class DISCOSNamespace:
     """
 
     __typename__ = "DISCOSNamespace"
+    __private__ = (
+        "type",
+        "title",
+        "description",
+        "enum",
+        "unit",
+        "format",
+        "_observers",
+        "_observers_lock",
+        "bind",
+        "unbind",
+        "wait",
+        "copy"
+    )
 
     def __init__(self, **kwargs: Any) -> None:
         """
@@ -27,6 +46,9 @@ class DISCOSNamespace:
 
         :param kwargs: Arbitrary keyword arguments to initialize attributes.
         """
+        object.__setattr__(self, "_observers", set())
+        object.__setattr__(self, "_observers_lock", threading.Lock())
+
         def transform(value: Any) -> Any:
             if isinstance(value, dict):
                 return DISCOSNamespace(**value)
@@ -40,9 +62,55 @@ class DISCOSNamespace:
         for k, v in list(kwargs.items()):
             if k in ["items", "value"]:
                 del kwargs[k]
-                k = "_DISCOSNamespace__value"
+                k = "_value"
             kwargs[k] = transform(v)
         self.__dict__.update(kwargs)
+
+    def bind(self, callback: Callable[[DISCOSNamespace], None]) -> None:
+        """
+        Bind a callback to the DISCOSNamespace object,
+        to be notified when it changes.
+
+        :param callback: A function that receives the updated object
+                         when obj changes.
+        """
+        with self._observers_lock:
+            self._observers.add(callback)
+
+    def unbind(self, callback: Callable[[DISCOSNamespace], None]) -> None:
+        """
+        Unbind a previously registered callback from the DISCOSNamespace
+        object.
+
+        :param callback: The callback function to remove.
+        """
+        with self._observers_lock:
+            self._observers.discard(callback)
+
+    def wait(self, timeout: float = None) -> DISCOSNamespace:
+        """
+        Block until the DISCOSNamespace triggers a change notification.
+
+        :param timeout: Optional timeout in seconds.
+        :return: The updated object, or None if the timeout occurred.
+        """
+        event = threading.Event()
+
+        def callback(_):
+            event.set()
+
+        self.bind(callback)
+        try:
+            event.wait(timeout)
+        finally:
+            self.unbind(callback)
+        return self
+
+    def copy(self) -> DISCOSNamespace:
+        """
+        Return a copy of the DISCOSNamespace.
+        """
+        return deepcopy(self)
 
     def __value_operation__(self, operation: Callable[[Any], Any]) -> Any:
         """
@@ -53,29 +121,59 @@ class DISCOSNamespace:
         :raises TypeError: If the object does not hold a primitive value.
         """
         if self.__has_value__(self) and \
-                not DISCOSNamespace.__is__(self.__get_value__(self)):
-            return operation(self.__get_value__(self))
+                not DISCOSNamespace.__is__(self._value):
+            return operation(self._value)
         raise TypeError(
             f"{self.__typename__} supports operations "
             "only when holding a primitive value"
         )
 
+    def __value_comparison__(
+        self,
+        op: Callable[[Any, Any], bool],
+        other: Any
+    ) -> bool:
+        """
+        Apply a comparison to the internal value if it is primitive,
+        or to the inner __dict__ if both operands are DISCOSNamespace
+        """
+        if DISCOSNamespace.__is__(other):
+            try:
+                return op(
+                    {
+                        k: v
+                        for k, v in vars(self).items()
+                        if not k.startswith("_") or k == "_value"
+                    },
+                    {
+                        k: v
+                        for k, v in vars(other).items()
+                        if not k.startswith("_") or k == "_value"
+                    },
+                )
+            except TypeError:
+                return False
+        if DISCOSNamespace.__has_value__(self):
+            return op(self._value, other)
+
+        return False
+
     def __repr__(self) -> str:
         """Return a string representation of the object."""
         if self.__has_value__(self):
-            return repr(self.__get_value__(self))
+            return repr(self._value)
         return f"<{self.__typename__}({self.__value_repr__(self)})>"
 
     def __str__(self) -> str:
         """Return a string representation of the object."""
         if self.__has_value__(self):
-            return str(self.__get_value__(self))
+            return str(self._value)
         return format(self, "")
 
     def __int__(self) -> int:
         """Return the internal value as an integer."""
         if self.__has_value__(self):
-            return int(self.__get_value__(self))
+            return int(self._value)
         raise TypeError(
             f"{self.__typename__} object cannot be converted to int"
         )
@@ -83,7 +181,7 @@ class DISCOSNamespace:
     def __float__(self) -> float:
         """Return the internal value as a float."""
         if self.__has_value__(self):
-            return float(self.__get_value__(self))
+            return float(self._value)
         raise TypeError(
             f"{self.__typename__} object cannot be converted to float"
         )
@@ -91,7 +189,7 @@ class DISCOSNamespace:
     def __neg__(self) -> Any:
         """Return the negated internal value."""
         if self.__has_value__(self):
-            return -self.__get_value__(self)
+            return -self._value
         raise TypeError(
             f"{self.__typename__} object cannot be negated"
         )
@@ -99,7 +197,7 @@ class DISCOSNamespace:
     def __bool__(self) -> bool:
         """Return the boolean representation of the internal value."""
         if self.__has_value__(self):
-            return bool(self.__get_value__(self))
+            return bool(self._value)
         raise TypeError(
             f"{self.__typename__} object cannot be converted to bool"
         )
@@ -113,19 +211,19 @@ class DISCOSNamespace:
         :raises TypeError: If not subscriptable.
         """
         if self.__has_value__(self):
-            return self.__get_value__(self)[item]
+            return self._value[item]
         raise TypeError(f"{self.__typename__} object is not subscriptable")
 
     def __len__(self) -> int:
         """Return the length of the internal value if applicable."""
         if self.__has_value__(self):
-            return len(self.__get_value__(self))
+            return len(self._value)
         raise TypeError(f"{self.__typename__} object has no length")
 
     def __iter__(self) -> Iterator[Any]:
         """Return an iterator over the internal value if iterable."""
         if self.__has_value__(self):
-            return iter(self.__get_value__(self))
+            return iter(self._value)
         raise TypeError(f"{self.__typename__} object is not iterable")
 
     def __setattr__(self, name: str, value: Any) -> None:
@@ -142,21 +240,31 @@ class DISCOSNamespace:
             "does not allow attribute deletion"
         )
 
-    def __ilshift__(self, other: Any) -> DISCOSNamespace:
+    def __ilshift__(self, other: DISCOSNamespace) -> DISCOSNamespace:
         """
         In-place merge of another DISCOSNamespace.
 
         :param other: Another DISCOSNamespace or compatible object.
         :return: Self after the merge.
         """
+        if self == other:
+            return self
+
         for k, ov in vars(other).items():
-            if k.startswith("_") and k != f"_{self.__typename__}__value":
+            if k.startswith("_") and k != "_value":
                 continue
+
             sv = getattr(self, k, None)
+
             if DISCOSNamespace.__is__(sv) and DISCOSNamespace.__is__(ov):
                 sv <<= ov
             else:
-                object.__setattr__(self, k, deepcopy(ov))
+                if ov == sv:
+                    continue
+                new = deepcopy(ov)
+                object.__setattr__(self, k, new)
+
+        self.__notify__()
         return self
 
     def __format__(self, spec: str) -> str:
@@ -173,7 +281,7 @@ with optional indentation level <n> (default is 2)
         :return: A JSON formatted string.
         """
         if self.__has_value__(self):
-            return format(self.__get_value__(self), spec)
+            return format(self._value, spec)
 
         fmt_spec = spec[1:] if spec.startswith("f") else spec
         fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("f") else fmt_spec
@@ -233,7 +341,7 @@ with optional indentation level <n> (default is 2)
         :param obj: The object to retrieve the value from.
         :return: The stored value (list if originally a tuple).
         """
-        value = object.__getattribute__(obj, f"_{cls.__typename__}__value")
+        value = object.__getattribute__(obj, "_value")
         if isinstance(value, tuple):
             value = list(value)
         return value
@@ -246,7 +354,7 @@ with optional indentation level <n> (default is 2)
         :param obj: The object to check.
         :return: True if it has a value, False otherwise.
         """
-        return hasattr(obj, f"_{cls.__typename__}__value")
+        return hasattr(obj, "_value")
 
     @classmethod
     def __is__(cls, obj: Any) -> bool:
@@ -269,8 +377,7 @@ with optional indentation level <n> (default is 2)
         return public_dict(
             obj,
             cls.__is__,
-            cls.__get_value__,
-            cls.__typename__
+            cls.__get_value__
         )
 
     @classmethod
@@ -283,13 +390,12 @@ with optional indentation level <n> (default is 2)
         :return: A dictionary with public fields.
         """
         def unwrap(value: Any) -> Any:
-            skip = ("type", "title", "description", "enum", "unit", "format")
             if cls.__is__(value):
                 if cls.__has_value__(value):
                     return unwrap(cls.__get_value__(value))
                 retval = {}
                 for k, v in vars(value).items():
-                    if k in skip:
+                    if k in cls.__private__:
                         continue
                     retval[k] = unwrap(v)
                 return retval
@@ -318,3 +424,11 @@ with optional indentation level <n> (default is 2)
         if isinstance(obj, (tuple, list)):
             return [cls.__value_repr__(v) for v in obj]
         return obj
+
+    def __notify__(self) -> None:
+        """
+        Execute the bound callbacks, if are present
+        """
+        with self._observers_lock:
+            for cb in self._observers:
+                cb(self)

@@ -1,5 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "srt/mount.json",
   "type": "object",
   "title": "SRT Mount",
   "description": "Status of the SRT DISCOS Mount component.",
@@ -143,7 +144,7 @@
           "title": "Motors",
           "description": "List of motor statuses.",
           "items": {
-            "$ref": "srt/mount.json#/$defs/motor"
+            "$ref": "#/$defs/motor"
           }
         }
       },
@@ -316,7 +317,7 @@
       "description": "Status socket status."
     },
     "status": {
-      "$ref": "definitions/status.json"
+      "$ref": "../definitions/status.json"
     },
     "azimuth": {
       "type": "object",
@@ -420,7 +421,7 @@
       ]
     },
     "timestamp": {
-      "$ref": "definitions/timestamp.json"
+      "$ref": "../definitions/timestamp.json"
     }
   },
   "required": [

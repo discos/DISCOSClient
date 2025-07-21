@@ -220,7 +220,7 @@
       ]
     },
     "status": {
-      "$ref": "definitions/status.json"
+      "$ref": "../definitions/status.json"
     },
     "target": {
       "type": "string",
@@ -252,7 +252,7 @@
       "unit": "km/s"
     },
     "timestamp": {
-      "$ref": "definitions/timestamp.json"
+      "$ref": "../definitions/timestamp.json"
     },
     "tracking": {
       "type": "boolean",

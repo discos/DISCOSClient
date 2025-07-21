@@ -31,7 +31,7 @@
       "unit": "°C"
     },
     "timestamp": {
-      "$ref": "definitions/timestamp.json"
+      "$ref": "../definitions/timestamp.json"
     },
     "windDirection": {
       "type": "number",
