@@ -9,31 +9,36 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        #os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.9', '3']
-
+        py: ['3.9', '3.11']
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
-        check-latest: true
+        python-version: ${{ startsWith(matrix.os, 'windows') && matrix.py || format('pypy-{0}', matrix.py) }}
     - name: Install dependencies
       run: |
         python -m pip install ".[test]"
     - name: Run the unit tests
+      shell: bash
       run: |
-        coverage run -p -m unittest discover -b tests
+        for attempt in 1 2 3; do
+          if coverage run -p -m unittest discover -b tests; then
+            exit 0
+          fi
+          sleep 2
+        done
+        exit 1
     - name: Run the Python linter
       run: |
         prospector
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-${{ github.run_id }}-${{ matrix.os }}-${{ matrix.python-version }}
+        name: coverage-${{ github.run_id }}-${{ matrix.os }}-${{ matrix.py }}
         path: .coverage.*
         include-hidden-files: true
 

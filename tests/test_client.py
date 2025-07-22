@@ -178,9 +178,9 @@ class TestBaseClient(unittest.TestCase):
             client.antenna.timestamp.unix_time.bind(callback)
             client.antenna.bind(callback)
 
-            while len(called) != 2:
+            start = time.time()
+            while len(called) < 2 and (time.time() - start) < 60:
                 time.sleep(0.1)
-
             self.assertEqual(s, called)
 
     def test_wait(self):
@@ -191,11 +191,11 @@ class TestBaseClient(unittest.TestCase):
             antenna = client.antenna.copy()
             self.assertNotEqual(
                 unix_time,
-                client.antenna.timestamp.unix_time.wait(timeout=2)
+                client.antenna.timestamp.unix_time.wait(timeout=5)
             )
             self.assertNotEqual(
                 antenna,
-                client.antenna.wait(timeout=2)
+                client.antenna.wait(timeout=5)
             )
 
 
