@@ -181,8 +181,6 @@ class TestBaseClient(unittest.TestCase):
             start = time.time()
             while len(called) < 2 and (time.time() - start) < 60:
                 time.sleep(0.1)
-
-            print(s, called)
             self.assertEqual(s, called)
 
     def test_wait(self):
