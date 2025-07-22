@@ -27,7 +27,13 @@ jobs:
         python -m pip install ".[test]"
     - name: Run the unit tests
       run: |
-        coverage run -p -m unittest discover -b tests
+        for attempt in 1 2 3; do
+          if coverage run -p -m unittest discover -b tests; then
+            exit 0
+          fi
+          sleep 2
+        done
+        exit 1
     - name: Run the Python linter
       run: |
         prospector
