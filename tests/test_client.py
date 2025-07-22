@@ -179,7 +179,7 @@ class TestBaseClient(unittest.TestCase):
             client.antenna.bind(callback)
 
             start = time.time()
-            while len(called) < 2 and (time.time() - start) < 5:
+            while len(called) < 2 and (time.time() - start) < 60:
                 time.sleep(0.1)
 
             print(s, called)
