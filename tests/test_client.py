@@ -163,7 +163,7 @@ class TestBaseClient(unittest.TestCase):
         )
         self.assertNotIn("\": ", f"{client:c}")
 
-    '''def test_bind(self):
+    def test_bind(self):
         with TestPublisher():
             client = DISCOSClient(address="127.0.0.1", port=16000)
             time.sleep(1)
@@ -181,7 +181,7 @@ class TestBaseClient(unittest.TestCase):
             while len(called) != 2:
                 time.sleep(0.1)
 
-            self.assertEqual(s, called)'''
+            self.assertEqual(s, called)
 
     def test_wait(self):
         with TestPublisher():
