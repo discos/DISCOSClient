@@ -38,7 +38,7 @@ jobs:
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-${{ github.run_id }}-${{ matrix.os }}-${{ matrix.python-version }}
+        name: coverage-${{ github.run_id }}-${{ matrix.os }}-${{ matrix.py }}
         path: .coverage.*
         include-hidden-files: true
 
