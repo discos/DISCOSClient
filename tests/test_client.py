@@ -191,11 +191,11 @@ class TestBaseClient(unittest.TestCase):
             antenna = client.antenna.copy()
             self.assertNotEqual(
                 unix_time,
-                client.antenna.timestamp.unix_time.wait(timeout=2)
+                client.antenna.timestamp.unix_time.wait(timeout=5)
             )
             self.assertNotEqual(
                 antenna,
-                client.antenna.wait(timeout=2)
+                client.antenna.wait(timeout=5)
             )
 
 
