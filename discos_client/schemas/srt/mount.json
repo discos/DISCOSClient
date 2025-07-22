@@ -324,7 +324,7 @@
       "title": "Azimuth axis status",
       "description": "Azimuth axis status of the antenna mount.",
       "allOf": [
-        { "$ref": "srt/mount.json#/$defs/axis_status" }
+        { "$ref": "#/$defs/axis_status" }
       ]
     },
     "elevation": {
@@ -332,7 +332,7 @@
       "title": "Elevation axis status",
       "description": "Elevation axis status of the antenna mount.",
       "allOf": [
-        { "$ref": "srt/mount.json#/$defs/axis_status" }
+        { "$ref": "#/$defs/axis_status" }
       ]
     },
     "cableWrap": {
@@ -363,7 +363,7 @@
           "title": "Motors",
           "description": "List of motor statuses.",
           "items": {
-            "$ref": "srt/mount.json#/$defs/motor"
+            "$ref": "#/$defs/motor"
           }
         }
       },
