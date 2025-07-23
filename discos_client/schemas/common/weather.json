@@ -61,5 +61,6 @@
     "windDirection",
     "windSpeed",
     "windSpeedPeak"
-  ]
+  ],
+  "additionalProperties": false
 }

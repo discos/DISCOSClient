@@ -172,7 +172,8 @@
         "brakeError",
         "servoError",
         "motors"
-      ]
+      ],
+      "additionalProperties": false
     },
     "motor": {
       "type": "object",
@@ -257,7 +258,8 @@
         "servoError",
         "sensorError",
         "busError"
-      ]
+      ],
+      "additionalProperties": false
     }
   },
   "properties": {
@@ -372,7 +374,8 @@
         "currentRate",
         "currentTrackingError",
         "motors"
-      ]
+      ],
+      "additionalProperties": false
     },
     "pointing": {
       "type": "object",
@@ -418,7 +421,8 @@
         "remainingTrackingPoints",
         "sector",
         "timeOffset"
-      ]
+      ],
+      "additionalProperties": false
     },
     "timestamp": {
       "$ref": "../definitions/timestamp.json"
@@ -442,5 +446,6 @@
     "statusSocketConnected",
     "timeError",
     "timestamp"
-  ]
+  ],
+  "additionalProperties": false
 }

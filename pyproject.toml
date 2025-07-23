@@ -25,5 +25,5 @@ packages = ["discos_client"]
 "discos_client" = ["schemas/**"]
 
 [project.optional-dependencies]
-test = ["coverage", "prospector"]
+test = ["coverage", "prospector", "jsonschema", "referencing"]
 docs = ["sphinx", "sphinx-rtd-theme", "sphinx-autodoc-typehints", "sphinx-jsonschema"]

@@ -37,7 +37,8 @@
             "currentSetup",
             "status",
             "timestamp"
-          ]
+          ],
+          "additionalProperties": false
         }
       },
       "required": ["boss"],
@@ -119,7 +120,8 @@
             "status",
             "timestamp",
             "vacuum"
-          ]
+          ],
+          "additionalProperties": false
         }
       },
       "minProperties": 1,
@@ -170,7 +172,8 @@
         "startFrequency",
         "bandWidth",
         "polarization"
-      ]
+      ],
+      "additionalProperties": false
     }
   },
   "anyOf": [

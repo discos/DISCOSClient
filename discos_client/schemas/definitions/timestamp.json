@@ -30,5 +30,6 @@
       "unit": "seconds"
     }
   },
-  "required": ["omg_time", "iso8601", "mjd", "unix_time"]
+  "required": ["omg_time", "iso8601", "mjd", "unix_time"],
+  "additionalProperties": false
 }

@@ -217,7 +217,8 @@
         "yPolarMotion",
         "ellipsoid",
         "DUT1"
-      ]
+      ],
+      "additionalProperties": false
     },
     "status": {
       "$ref": "../definitions/status.json"
@@ -324,5 +325,6 @@
     "vradDefinition",
     "vradReferenceFrame",
     "waveLength"
-  ]
+  ],
+  "additionalProperties": false
 }
