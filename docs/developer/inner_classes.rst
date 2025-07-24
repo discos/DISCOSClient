@@ -17,7 +17,8 @@ BaseClient
 
 .. autoclass:: discos_client.client.BaseClient
    :members:
-   :special-members: __init__, __del__, __initialize__, __to_namespace__, __update_namespace__, __public_dict__, __format__, __str__, __repr__
+   :special-members:
+   :skip-members: __weakref__
 
 SyncClient
 ----------
@@ -38,9 +39,5 @@ DISCOSNamespace
 
 .. autoclass:: discos_client.namespace.DISCOSNamespace
    :members:
-   :special-members: __init__, __value_operation__, __repr__, __str__,
-                     __int__, __float__, __neg__, __bool__, __getitem__,
-                     __len__, __iter__, __setattr__, __delattr__,
-                     __ilshift__, __format__, __deepcopy__,
-                     __get_value__, __has_value__, __is__,
-                     __full_dict__, __message_dict__, __value_repr__
+   :special-members:
+   :skip-members: __eq__, __ge__, __gt__, __le__, __lt__, __ne__, __weakref__

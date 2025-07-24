@@ -1,6 +1,7 @@
 import os
 import importlib
 import sys
+from sphinx.ext.autodoc import ClassDocumenter
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.abspath('../discos_client'))
 
@@ -61,6 +62,31 @@ html_css_files = [
 ]
 
 html_static_path = ['_static']
+
+
+class SkipMembersClassDocumenter(ClassDocumenter):
+    objtype = "class"
+
+    option_spec = ClassDocumenter.option_spec.copy()
+    option_spec["skip-members"] = lambda arg: [name.strip() for name in arg.split(",")] if arg else []
+
+    def parse_name(self):
+        return super().parse_name()
+
+
+def skip_special_members(app, what, name, obj, skip, options):
+    global_skips = app.config.autoclass_skip_members_default or set()
+    directive_skips = set(options.get("skip-members", []))
+
+    if name in global_skips or name in directive_skips:
+        return True
+    return None
+
+
+def setup(app):
+    app.add_config_value("autoclass_skip_members_default", set(), "env")
+    app.add_autodocumenter(SkipMembersClassDocumenter, override=True)
+    app.connect("autodoc-skip-member", skip_special_members)
 
 
 sjs_wide_format = importlib.import_module("sphinx-jsonschema.wide_format")

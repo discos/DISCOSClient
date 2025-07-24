@@ -5,6 +5,7 @@ from copy import deepcopy
 from discos_client.namespace import DISCOSNamespace
 
 
+# pylint: disable=too-many-public-methods
 class TestDISCOSNamespace(unittest.TestCase):
 
     def test_assignment(self):
@@ -81,6 +82,30 @@ class TestDISCOSNamespace(unittest.TestCase):
         self.assertEqual(
             str(ex.exception),
             "DISCOSNamespace object cannot be negated"
+        )
+
+    def test_abs(self):
+        ns = DISCOSNamespace(value=-1.0)
+        b = abs(ns)
+        self.assertEqual(b, 1.0)
+        ns = DISCOSNamespace(a="foo")
+        with self.assertRaises(TypeError) as ex:
+            _ = abs(ns)
+        self.assertEqual(
+            str(ex.exception),
+            "DISCOSNamespace object is not a numeric type."
+        )
+
+    def test_round(self):
+        ns = DISCOSNamespace(value=0.123456)
+        b = round(ns, 3)
+        self.assertEqual(b, 0.123)
+        ns = DISCOSNamespace(a="foo")
+        with self.assertRaises(TypeError) as ex:
+            _ = round(ns)
+        self.assertEqual(
+            str(ex.exception),
+            "DISCOSNamespace object cannot be rounded."
         )
 
     def test_bool(self):
@@ -235,6 +260,29 @@ class TestDISCOSNamespace(unittest.TestCase):
         self.assertNotEqual(ns, a + 1)
         self.assertFalse(ns < ns2)
         self.assertFalse(ns > ns2)
+
+    def test_dir(self):
+        ns = DISCOSNamespace(value="foo", title="title")
+        attributes = dir(ns)
+        self.assertIn("upper", attributes)
+        self.assertIn("title", attributes)
+        self.assertIn("startswith", attributes)
+
+    def test_getattr(self):
+        ns = DISCOSNamespace(value="foo")
+        self.assertEqual(ns.upper(), "foo".upper())
+
+    def test_index(self):
+        ns = DISCOSNamespace(value=2)
+        mylist = [0, 1, 2, 3, 4, 5]
+        self.assertEqual(mylist[ns], 2)
+        ns = DISCOSNamespace(value="foo")
+        with self.assertRaises(TypeError) as ex:
+            _ = mylist[ns]
+        self.assertEqual(
+            str(ex.exception),
+            "DISCOSNamespace value is not an integer"
+        )
 
 
 if __name__ == '__main__':

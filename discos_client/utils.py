@@ -25,22 +25,24 @@ def delegated_operations(handler: str) -> Callable[[type], type]:
 
         for op in ops:
             method_name = f"__{op}__"
+            is_reflective = op.startswith("r")
+            op = op[1:] if is_reflective else op
+            op_func = getattr(operator, op)
 
-            def make_method(op_name: str) -> Callable:
-                def method(self: Any, other: Any) -> Any:
-                    if op_name.startswith('r'):
-                        op_func = getattr(operator, op_name[1:])
+            def method(
+                self: Any,
+                other: Any,
+                op_func=op_func,
+                is_reflective=is_reflective
+            ) -> Any:
+                return getattr(self, handler)(
+                    lambda x: op_func(other, x)
+                    if is_reflective
+                    else op_func(x, other)
+                )
 
-                        def func(x):
-                            return op_func(other, x)
-                    else:
-                        op_func = getattr(operator, op_name)
+            setattr(cls, method_name, method)
 
-                        def func(x):
-                            return op_func(x, other)
-                    return getattr(self, handler)(func)
-                return method
-            setattr(cls, method_name, make_method(op))
         return cls
     return decorator
 
@@ -50,13 +52,16 @@ def delegated_comparisons(handler: str) -> Callable[[type], type]:
         comparisons = 'eq ge gt le lt ne'.split()
         for op in comparisons:
             method_name = f"__{op}__"
+            op_func = getattr(operator, op)
 
-            def make_method(op_name: str) -> Callable:
-                def method(self: Any, other: Any) -> Any:
-                    op_func = getattr(operator, op_name)
-                    return getattr(self, handler)(op_func, other)
-                return method
-            setattr(cls, method_name, make_method(op))
+            def method(
+                self: Any,
+                other: Any,
+                op_func=op_func
+            ) -> Any:
+                return getattr(self, handler)(op_func, other)
+
+            setattr(cls, method_name, method)
         return cls
     return decorator
 

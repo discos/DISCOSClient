@@ -182,6 +182,10 @@ class TestBaseClient(unittest.TestCase):
             while len(called) < 2 and (time.time() - start) < 60:
                 time.sleep(0.1)
             self.assertEqual(s, called)
+            client.antenna.timestamp.unix_time.unbind(callback)
+            client.antenna.unbind(callback, str)  # Never used predicate
+            client.antenna.unbind(callback)
+            client.antenna.unbind(int)  # Never bound callback
 
     def test_wait(self):
         with TestPublisher():
