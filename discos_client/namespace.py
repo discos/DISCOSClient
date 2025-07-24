@@ -346,18 +346,6 @@ class DISCOSNamespace:
                 return iter(self._value)
         raise TypeError(f"{self.__typename__} object is not iterable")
 
-    def __index__(self) -> int:
-        """
-        Return the internal value as an integer index.
-
-        :return: The internal integer value.
-        :raises TypeError: If the internal value is not an integer.
-        """
-        if self.__has_value__(self) and isinstance(self._value, int):
-            with self._lock:
-                return self._value
-        raise TypeError(f"{self.__typename__} value is not an integer")
-
     def __setattr__(self, name: str, value: Any) -> None:
         """
         Prevent attribute assignment.

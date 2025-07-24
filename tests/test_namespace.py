@@ -5,7 +5,6 @@ from copy import deepcopy
 from discos_client.namespace import DISCOSNamespace
 
 
-# pylint: disable=too-many-public-methods
 class TestDISCOSNamespace(unittest.TestCase):
 
     def test_assignment(self):
@@ -271,18 +270,6 @@ class TestDISCOSNamespace(unittest.TestCase):
     def test_getattr(self):
         ns = DISCOSNamespace(value="foo")
         self.assertEqual(ns.upper(), "foo".upper())
-
-    def test_index(self):
-        ns = DISCOSNamespace(value=2)
-        mylist = [0, 1, 2, 3, 4, 5]
-        self.assertEqual(mylist[ns], 2)
-        ns = DISCOSNamespace(value="foo")
-        with self.assertRaises(TypeError) as ex:
-            _ = mylist[ns]
-        self.assertEqual(
-            str(ex.exception),
-            "DISCOSNamespace value is not an integer"
-        )
 
 
 if __name__ == '__main__':
