@@ -17,6 +17,7 @@ More details regarding each schema can be found in the following sections.
    :maxdepth: 2
 
    definitions
+   scheduler
    antenna
    mount
    receivers

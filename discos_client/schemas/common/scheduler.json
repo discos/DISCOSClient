@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "common/scheduler.json",
+  "title": "Scheduler status",
+  "type": "object",
+  "description": "This schema is sent by the DISCOS Scheduler component. It holds information regarding the currently selected backend, recorder, section, as well as the current project ID, scan, subscan and running schedule.",
+  "node": "scheduler",
+  "properties": {
+    "currentBackend": {
+      "type": "string",
+      "title": "Current Backend",
+      "description": "Name of the currently used backend."
+    },
+    "currentDevice": {
+      "type": "number",
+      "title": "Current Device",
+      "description": "Identification number of the currently used device (channel)."
+    },
+    "currentRecorder": {
+      "type": "string",
+      "title": "Current Recorder",
+      "description": "Name of the currently used recorder."
+    },
+    "projectCode": {
+      "type": "string",
+      "title": "Project Code",
+      "description": "Identification number of the current project user."
+    },
+    "restFrequency": {
+      "type": "array",
+      "title": "Rest Frequency",
+      "description": "Currently configured rest frequency for each section of the backend.",
+      "unit": "MHz",
+      "items": {
+        "type": "number"
+      }
+    },
+    "scanID": {
+      "type": "number",
+      "title": "Scan ID",
+      "description": "Identification number of the currently running scan."
+    },
+    "scheduleName": {
+      "type": "string",
+      "title": "Schedule name",
+      "description": "Name of the currently running schedule."
+    },
+    "status": {
+      "$ref": "../definitions/status.json"
+    },
+    "subScanID": {
+      "type": "number",
+      "title": "SubScan ID",
+      "description": "Identification number of the currently running subscan."
+    },
+    "timestamp": {
+      "$ref": "../definitions/timestamp.json"
+    },
+    "tracking": {
+      "type": "boolean",
+      "title": "Tracking flag",
+      "description": "Indicates whether all the subsystems are tracking the given target."
+    }
+  },
+  "required": [
+    "currentBackend",
+    "currentDevice",
+    "currentRecorder",
+    "projectCode",
+    "restFrequency",
+    "scanID",
+    "scheduleName",
+    "status",
+    "subScanID",
+    "timestamp",
+    "tracking"
+  ],
+  "additionalProperties": false
+}
