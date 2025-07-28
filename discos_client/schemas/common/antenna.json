@@ -14,30 +14,30 @@
     },
     "azimuthOffset": {
       "type": "number",
-      "title": "Azimuth offset",
+      "title": "Azimuth Offset",
       "description": "Offset applied to the azimuth angle.",
       "unit": "degrees"
     },
     "correctionEnabled": {
       "type": "boolean",
-      "title": "Pointing corrections",
+      "title": "Pointing Corrections",
       "description": "Indicates whether automatic pointing correction is enabled."
     },
     "declinationOffset": {
       "type": "number",
-      "title": "Declination offset",
+      "title": "Declination Offset",
       "description": "Offset applied to the declination angle.",
       "unit": "degrees"
     },
     "elevationOffset": {
       "type": "number",
-      "title": "Elevation offset",
+      "title": "Elevation Offset",
       "description": "Offset applied to the elevation angle.",
       "unit": "degrees"
     },
     "generatorType": {
       "type": "string",
-      "title": "Generator type",
+      "title": "Generator Type",
       "description": "Type of pointing generator used for tracking.",
       "enum": [
         "SIDEREAL",
@@ -51,85 +51,85 @@
     },
     "latitudeOffset": {
       "type": "number",
-      "title": "Galactic latitude offset",
+      "title": "Galactic Latitude Offset",
       "description": "Offset applied to the galactic latitude.",
       "unit": "degrees"
     },
     "longitudeOffset": {
       "type": "number",
-      "title": "Galactic longitude offset",
+      "title": "Galactic Longitude Offset",
       "description": "Offset applied to the galactic longitude.",
       "unit": "degrees"
     },
     "observedAzimuth": {
       "type": "number",
-      "title": "Observed azimuth",
+      "title": "Observed Azimuth",
       "description": "Observed azimuth angle of the antenna.",
       "unit": "degrees"
     },
     "observedDeclination": {
-      "type": "number",
-      "title": "Observed declination",
+      "type": "string",
+      "title": "Observed Declination",
       "description": "Observed declination angle of the antenna.",
-      "unit": "degrees"
+      "unit": "dms"
     },
     "observedElevation": {
       "type": "number",
-      "title": "Observed elevation",
+      "title": "Observed Elevation",
       "description": "Observed elevation angle of the antenna.",
       "unit": "degrees"
     },
     "observedGalLatitude": {
-      "type": "number",
-      "title": "Observed galactic latitude",
+      "type": "string",
+      "title": "Observed Galactic Latitude",
       "description": "Observed galactic latitude of the antenna pointing.",
-      "unit": "degrees"
+      "unit": "dms"
     },
     "observedGalLongitude": {
-      "type": "number",
-      "title": "Observed galactic longitude",
+      "type": "string",
+      "title": "Observed Galactic Longitude",
       "description": "Observed galactic longitude of the antenna pointing.",
-      "unit": "degrees"
+      "unit": "dms"
     },
     "observedRightAscension": {
-      "type": "number",
-      "title": "Observed right ascension",
+      "type": "string",
+      "title": "Observed Right Ascension",
       "description": "Observed right ascension of the antenna pointing.",
-      "unit": "degrees"
+      "unit": "hms"
     },
     "pointingAzimuthCorrection": {
       "type": "number",
-      "title": "Azimuth pointing correction",
+      "title": "Azimuth Pointing Correction",
       "description": "Computed correction for azimuth pointing.",
       "unit": "degrees"
     },
     "pointingElevationCorrection": {
       "type": "number",
-      "title": "Elevation pointing correction",
+      "title": "Elevation Pointing Correction",
       "description": "Computed correction for elevation pointing.",
       "unit": "degrees"
     },
     "rawAzimuth": {
       "type": "number",
-      "title": "Raw azimuth",
+      "title": "Raw Azimuth",
       "description": "Raw azimuth reading from the encoder.",
       "unit": "degrees"
     },
     "rawElevation": {
       "type": "number",
-      "title": "Raw elevation",
+      "title": "Raw Elevation",
       "description": "Raw elevation reading from the encoder.",
       "unit": "degrees"
     },
     "refractionCorrection": {
       "type": "number",
-      "title": "Refraction pointing correction",
+      "title": "Refraction Pointing Correction",
       "description": "Atmospheric refraction correction applied to elevation.",
       "unit": "degrees"
     },
     "rightAscensionOffset": {
       "type": "number",
-      "title": "Right ascension offset",
+      "title": "Right Ascension Offset",
       "description": "Offset applied to right ascension.",
       "unit": "degrees"
     },
@@ -140,25 +140,25 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "Site name",
+          "title": "Site Name",
           "description": "Name of the site/observatory.",
           "enum": ["Medicina", "Noto", "SRT"]
         },
         "longitude": {
-          "type": "number",
-          "title": "Longitude",
+          "type": "string",
+          "title": "Site Longitude",
           "description": "Longitude of the site, in degrees east of Greenwich.",
-          "unit": "degrees"
+          "unit": "dms"
         },
         "latitude": {
-          "type": "number",
-          "title": "Latitude",
+          "type": "string",
+          "title": "Site Latitude",
           "description": "Latitude of the site, in degrees north of the equator.",
-          "unit": "degrees"
+          "unit": "dms"
         },
         "height": {
           "type": "number",
-          "title": "Height",
+          "title": "Site Height",
           "description": "Geodetic height of the site above the reference ellipsoid.",
           "unit": "meters"
         },
@@ -229,26 +229,26 @@
       "description": "Identifier or name of the current observed target."
     },
     "targetDeclination": {
-      "type": "number",
-      "title": "Target declination",
+      "type": "string",
+      "title": "Target Declination",
       "description": "Declination coordinate of the observed target.",
-      "unit": "degrees"
+      "unit": "dms"
     },
     "targetFlux": {
       "type": "number",
-      "title": "Target flux",
+      "title": "Target Flux",
       "description": "Flux density of the target.",
       "unit": "Jansky"
     },
     "targetRightAscension": {
-      "type": "number",
-      "title": "Target right ascension",
+      "type": "string",
+      "title": "Target Right Ascension",
       "description": "Right ascension coordinate of the observed target.",
-      "unit": "degrees"
+      "unit": "hms"
     },
     "targetVrad": {
       "type": "number",
-      "title": "Target radial velocity",
+      "title": "Target Radial Velocity",
       "description": "Radial velocity of the target.",
       "unit": "km/s"
     },
@@ -257,12 +257,12 @@
     },
     "tracking": {
       "type": "boolean",
-      "title": "Tracking flag",
+      "title": "Tracking Flag",
       "description": "Indicates whether the antenna is tracking the given coordinates."
     },
     "vradDefinition": {
       "type": "string",
-      "title": "Target radial velocity definition",
+      "title": "Target Radial Velocity Definition",
       "description": "Radial velocity definition of the target.",
       "enum": [
         "RADIO",
@@ -273,7 +273,7 @@
     },
     "vradReferenceFrame": {
       "type": "string",
-      "title": "Target radial velocity reference frame",
+      "title": "Target Radial Velocity Reference Frame",
       "description": "Reference frame used for the target radial velocity measurements.",
       "enum": [
         "TOPOCENTRIC",
@@ -287,7 +287,7 @@
     },
     "waveLength": {
       "type": "number",
-      "title": "Observation wavelength",
+      "title": "Observation Wavelength",
       "description": "Currently used wavelength.",
       "unit": "meters"
     }
