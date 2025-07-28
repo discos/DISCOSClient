@@ -69,6 +69,24 @@ class DISCOSNamespace:
             kwargs[k] = transform(v)
         self.__dict__.update(kwargs)
 
+    def get_value(self) -> Any:
+        """
+        Return the internal primitive value.
+
+        :return: The internal value of the instance.
+        """
+        def raise_error():
+            raise AttributeError(
+                f"'{self.__typename__}' object has no attribute 'get_value'"
+            )
+
+        if not self.__has_value__(self):
+            raise_error()
+        value = self._value
+        if DISCOSNamespace.__is__(value):
+            raise_error()
+        return value
+
     def bind(
         self,
         callback: Callable[[DISCOSNamespace], None],
@@ -609,7 +627,12 @@ with optional indentation level <n> (default is 2)
         :return: Sorted list of attribute names.
         """
         attrs = set(super().__dir__())
-        if self.__has_value__(self):
-            with self._lock:
-                attrs.update(dir(self._value))
+        if not self.__has_value__(self):
+            attrs.discard("get_value")
+        else:
+            value = self._value
+            if DISCOSNamespace.__is__(value):
+                attrs.discard("get_value")
+            else:
+                attrs.update(dir(value))
         return sorted(attrs)

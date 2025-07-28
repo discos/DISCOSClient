@@ -5,6 +5,7 @@ from copy import deepcopy
 from discos_client.namespace import DISCOSNamespace
 
 
+# pylint: disable=too-many-public-methods
 class TestDISCOSNamespace(unittest.TestCase):
 
     def test_assignment(self):
@@ -266,10 +267,34 @@ class TestDISCOSNamespace(unittest.TestCase):
         self.assertIn("upper", attributes)
         self.assertIn("title", attributes)
         self.assertIn("startswith", attributes)
+        ns = DISCOSNamespace(title="title")
+        attributes = dir(ns)
+        self.assertNotIn("get_value", attributes)
+        ns = DISCOSNamespace(value=ns)
+        attributes = dir(ns)
+        self.assertNotIn("get_value", attributes)
 
     def test_getattr(self):
         ns = DISCOSNamespace(value="foo")
         self.assertEqual(ns.upper(), "foo".upper())
+
+    def test_get_value(self):
+        ns = DISCOSNamespace(value="foo")
+        self.assertIsInstance(ns.get_value(), str)
+        ns = DISCOSNamespace(value=ns)
+        with self.assertRaises(AttributeError) as ex:
+            _ = ns.get_value()
+        self.assertEqual(
+            str(ex.exception),
+            "'DISCOSNamespace' object has no attribute 'get_value'"
+        )
+        ns = DISCOSNamespace(title="foo")
+        with self.assertRaises(AttributeError) as ex:
+            _ = ns.get_value()
+        self.assertEqual(
+            str(ex.exception),
+            "'DISCOSNamespace' object has no attribute 'get_value'"
+        )
 
 
 if __name__ == '__main__':
