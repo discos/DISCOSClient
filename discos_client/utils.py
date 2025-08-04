@@ -71,6 +71,8 @@ def public_dict(
     is_fn,
     get_value_fn
 ) -> Any:
+    if not is_fn(obj):
+        return obj
     d = {}
     for k, v in vars(obj).items():
         if k == "_value":

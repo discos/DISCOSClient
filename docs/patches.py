@@ -59,7 +59,7 @@ def _complexstructures(self, schema):
             if items:
                 key = k
                 if k == 'allOf':
-                    key = 'properties'
+                    key = 'all properties of'
                 rows.extend(self._prepend(self._cell(key), items))
             del schema[k]
 

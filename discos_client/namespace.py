@@ -576,7 +576,7 @@ with optional indentation level <n> (default is 2)
             return {
                 k: cls.__value_repr__(v)
                 for k, v in vars(obj).items()
-                if not k.startswith("_") and cls.__is__(v)
+                if not k.startswith("_")
             }
         if isinstance(obj, (tuple, list)):
             return [cls.__value_repr__(v) for v in obj]
@@ -633,6 +633,5 @@ with optional indentation level <n> (default is 2)
             value = self._value
             if DISCOSNamespace.__is__(value):
                 attrs.discard("get_value")
-            else:
-                attrs.update(dir(value))
+            attrs.update(dir(value))
         return sorted(attrs)

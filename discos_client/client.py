@@ -130,8 +130,9 @@ class BaseClient:
                 )
                 self.__update_namespace__(topic, payload)
             except zmq.Again:  # pragma: no cover
-                dummy = self._schema_merger.merge_schema(t, {})
-                self.__update_namespace__(t, DISCOSNamespace(**dummy))
+                self.__update_namespace__(t, DISCOSNamespace(
+                    **self._schema_merger.merge_schema(t, {})
+                ))
             self._socket.unsubscribe(f'{rand_id}_{t}')
         self._socket.setsockopt(zmq.RCVTIMEO, -1)
         for topic in self._topics:
