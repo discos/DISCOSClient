@@ -34,6 +34,12 @@
           "title": "System Offset",
           "description": "Axis system offset.",
           "unit": "mm"
+        },
+        "trackingError": {
+          "type": "number",
+          "title": "Tracking Error",
+          "description": "Axis tracking error.",
+          "unit": "mm"
         }
       },
       "required": [
@@ -71,6 +77,12 @@
           "title": "System Offset",
           "description": "Axis system offset.",
           "unit": "degrees"
+        },
+        "trackingError": {
+          "type": "number",
+          "title": "Tracking Error",
+          "description": "Axis tracking error.",
+          "unit": "degrees"
         }
       },
       "required": [
@@ -92,203 +104,267 @@
         "GREGORIAN COVER IN WRONG POSITION",
         "CONFIGURATION ERROR",
         "REMOTE COMMAND ERROR",
-        "A MINOR SERVO IS BLOCKED",
+        "MINOR SERVO IS BLOCKED",
         "DRIVE CABINET ERROR"
       ]
     },
     "boss": {
       "type": "object",
+      "title": "Minor Servo Boss",
+      "description": "Status of the DISCOS MinorServoBoss component.",
+      "node": "minor_servo.boss",
       "properties": {
-        "boss": {
-          "type": "object",
-          "title": "Minor Servo Boss",
-          "description": "Status of the DISCOS MinorServoBoss component.",
-          "node": "minor_servo.boss",
-          "properties": {
-            "PLCFirmwareVersion": {
-              "type": "string",
-              "title": "PLC Firmware Version",
-              "description": "Firmware version of the minor servo PLC controller."
-            },
-            "currentSetup": {
-              "type": "string",
-              "title": "Current setup",
-              "description": "Current focal setup."
-            },
-            "emergency": {
-              "type": "boolean",
-              "title": "Emergency",
-              "description": "Minor servo system in emergency status."
-            },
-            "errorCode": {
-              "$ref": "#/$defs/error_code"
-            },
-            "gregorianCoverPosition": {
-              "type": "string",
-              "title": "Gregorian cover position",
-              "description": "Current position of the gregorian cover.",
-              "enum": [
-                "UNKNOWN",
-                "CLOSED",
-                "OPEN"
-              ]
-            },
-            "maintenanceMode": {
-              "type": "boolean",
-              "title": "Maintenance mode",
-              "description": "Minor servo system in maintenance mode."
-            },
-            "motionInfo": {
-              "type": "string",
-              "title": "Motion info",
-              "description": "Information regarding the motion status of the minor servo system.",
-              "enum": [
-                "NOT CONFIGURED",
-                "STARTING",
-                "CONFIGURED",
-                "TRACKING",
-                "PARKING",
-                "PARKED",
-                "ERROR"
-              ]
-            },
-            "scanning": {
-              "type": "boolean",
-              "title": "Scanning",
-              "description": "Minor servo system is performing a scan."
-            },
-            "socketConnected": {
-              "type": "boolean",
-              "title": "Socket connected",
-              "description": "Minor servo system socket is connected."
-            },
-            "status": {
-              "$ref": "../definitions/status.json"
-            },
-            "timestamp": {
-              "$ref": "../definitions/timestamp.json"
-            },
-            "tracking": {
-              "type": "boolean",
-              "title": "Tracking",
-              "description": "Minor servo system is tracking the given coordinates."
-            },
-            "trackingEnabled": {
-              "type": "boolean",
-              "title": "Tracking enabled",
-              "description": "Minor servo system will track the given coordinates."
-            }
-          },
-          "required": [
-            "PLCFirmwareVersion",
-            "currentSetup",
-            "emergency",
-            "errorCode",
-            "gregorianCoverPosition",
-            "maintenanceMode",
-            "motionInfo",
-            "scanning",
-            "socketConnected",
-            "status",
-            "timestamp",
-            "tracking",
-            "trackingEnabled"
+        "PLCFirmwareVersion": {
+          "type": "string",
+          "title": "PLC Firmware Version",
+          "description": "Firmware version of the minor servo PLC controller."
+        },
+        "currentSetup": {
+          "type": "string",
+          "title": "Current setup",
+          "description": "Current focal setup."
+        },
+        "emergency": {
+          "type": "boolean",
+          "title": "Emergency",
+          "description": "Minor servo system in emergency status."
+        },
+        "errorCode": {
+          "$ref": "#/$defs/error_code"
+        },
+        "gregorianCoverPosition": {
+          "type": "string",
+          "title": "Gregorian cover position",
+          "description": "Current position of the gregorian cover.",
+          "enum": [
+            "UNKNOWN",
+            "CLOSED",
+            "OPEN"
           ]
+        },
+        "maintenanceMode": {
+          "type": "boolean",
+          "title": "Maintenance mode",
+          "description": "Minor servo system in maintenance mode."
+        },
+        "motionInfo": {
+          "type": "string",
+          "title": "Motion info",
+          "description": "Information regarding the motion status of the minor servo system.",
+          "enum": [
+            "NOT CONFIGURED",
+            "STARTING",
+            "CONFIGURED",
+            "TRACKING",
+            "PARKING",
+            "PARKED",
+            "ERROR"
+          ]
+        },
+        "scanning": {
+          "type": "boolean",
+          "title": "Scanning",
+          "description": "Minor servo system is performing a scan."
+        },
+        "socketConnected": {
+          "type": "boolean",
+          "title": "Socket connected",
+          "description": "Minor servo system socket is connected."
+        },
+        "status": {
+          "$ref": "../definitions/status.json"
+        },
+        "timestamp": {
+          "$ref": "../definitions/timestamp.json"
+        },
+        "tracking": {
+          "type": "boolean",
+          "title": "Tracking",
+          "description": "Minor servo system is tracking the given coordinates."
+        },
+        "trackingEnabled": {
+          "type": "boolean",
+          "title": "Tracking enabled",
+          "description": "Minor servo system will track the given coordinates."
         }
       },
       "required": [
-        "boss"
+        "PLCFirmwareVersion",
+        "currentSetup",
+        "emergency",
+        "errorCode",
+        "gregorianCoverPosition",
+        "maintenanceMode",
+        "motionInfo",
+        "scanning",
+        "socketConnected",
+        "status",
+        "timestamp",
+        "tracking",
+        "trackingEnabled"
       ]
     },
     "minor_servo": {
       "type": "object",
-      "patternProperties": {
-        "^(?!boss$).*": {
+      "title": "Minor Servo Status",
+      "description": "Status of a minor servo component.",
+      "node": "minor_servo.<minorServoName>",
+      "properties": {
+        "axes": {
           "type": "object",
-          "title": "Minor Servo Status",
-          "description": "Status of a minor servo component.",
-          "node": "minor_servo.<minorServoName>",
+          "title": "Axes",
+          "description": "Minor servo axes information.",
+          "patternProperties": {
+            "^T[A-Z]+$": {
+              "$ref": "#/$defs/translation_axis_info"
+            },
+            "^R[A-Z]+$": {
+              "$ref": "#/$defs/rotation_axis_info"
+            }
+          }
+        },
+        "blocked": {
+          "type": "boolean",
+          "title": "Blocked",
+          "description": "Minor servo is blocked"
+        },
+        "currentSetup": {
+          "type": "string",
+          "title": "Current Setup",
+          "description": "Minor servo current setup."
+        },
+        "driveCabinetStatus": {
+          "type": "string",
+          "title": "Drive Cabinet Status",
+          "description": "Status of the minor servo drive cabinet",
+          "enum": [
+            "OK",
+            "WARNING",
+            "FAILURE"
+          ]
+        },
+        "enabled": {
+          "type": "boolean",
+          "title": "Enabled",
+          "description": "Minor servo is enabled."
+        },
+        "errorCode": {
+          "$ref": "#/$defs/error_code"
+        },
+        "inUse": {
+          "type": "boolean",
+          "title": "In Use",
+          "description": "Minor servo is used in the current focal configuration."
+        },
+        "operativeMode": {
+          "type": "string",
+          "title": "Operative Mode",
+          "description": "Minor servo current operative mode.",
+          "enum": [
+            "UNKNOWN",
+            "SETUP",
+            "STOW",
+            "STOP",
+            "PRESET",
+            "PROGRAM TRACK"
+          ]
+        },
+        "timestamp": {
+          "$ref": "../definitions/timestamp.json"
+        }
+      },
+      "required": [
+        "axes",
+        "blocked",
+        "currentSetup",
+        "driveCabinetStatus",
+        "enabled",
+        "errorCode",
+        "inUse",
+        "operativeMode",
+        "timestamp"
+      ]
+    },
+    "tracking_minor_servo": {
+      "type": "object",
+      "title": "Tracking Minor Servo Status",
+      "description": "Status of a tracking minor servo component.",
+      "node": "minor_servo.<minorServoName>",
+      "allOf": [
+        { "$ref": "#/$defs/minor_servo" },
+        {
           "properties": {
-            "axes": {
-              "type": "object",
-              "title": "Axes",
-              "description": "Minor servo axes information.",
-              "patternProperties": {
-                "^T[A-Z]+$": {
-                  "$ref": "#/$defs/translation_axis_info"
-                },
-                "^R[A-Z]+$": {
-                  "$ref": "#/$defs/rotation_axis_info"
-                }
-              }
+            "remainingTrajectoryPoints": {
+              "type": "number",
+              "title": "Remaining Trajectory Points",
+              "description": "Remaining number of points for the current trajectory."
             },
-            "blocked": {
+            "totalTrajectoryPoints": {
+              "type": "number",
+              "title": "Total Trajectory Points",
+              "description": "Total number of points of the current trajectory."
+            },
+            "tracking": {
               "type": "boolean",
-              "title": "Blocked",
-              "description": "Minor servo is blocked"
+              "title": "Tracking",
+              "description": "Minor servo is tracking."
             },
-            "currentSetup": {
-              "type": "string",
-              "title": "Current Setup",
-              "description": "Minor servo current setup."
-            },
-            "driveCabinetStatus": {
-              "type": "string",
-              "title": "Drive Cabinet Status",
-              "description": "Status of the minor servo drive cabinet",
-              "enum": [
-                "OK",
-                "WARNING",
-                "FAILURE"
-              ]
-            },
-            "enabled": {
-              "type": "boolean",
-              "title": "Enabled",
-              "description": "Minor servo is enabled."
-            },
-            "errorCode": {
-              "$ref": "#/$defs/error_code"
-            },
-            "inUse": {
-              "type": "boolean",
-              "title": "In Use",
-              "description": "Minor servo is used in the current focal configuration."
-            },
-            "operativeMode": {
-              "type": "string",
-              "title": "Operative Mode",
-              "description": "Minor servo current operative mode.",
-              "enum": [
-                "UNKNOWN",
-                "SETUP",
-                "STOW",
-                "STOP",
-                "PRESET",
-                "PROGRAM TRACK"
-              ]
-            },
-            "timestamp": {
-              "$ref": "../definitions/timestamp.json"
+            "trajectoryID": {
+              "type": "number",
+              "title": "Trajectory ID",
+              "description": "ID of the current tracked trajectory."
             }
           },
           "required": [
-            "axes",
-            "blocked",
-            "currentSetup",
-            "driveCabinetStatus",
-            "enabled",
-            "errorCode",
-            "inUse",
-            "operativeMode",
-            "timestamp"
+            "remainingTrajectoryPoints",
+            "totalTrajectoryPoints",
+            "tracking",
+            "trajectoryID"
           ]
         }
-      }
+      ]
     }
   },
   "anyOf": [
-    { "$ref": "#/$defs/boss" },
-    { "$ref": "#/$defs/minor_servo" }
+    {
+      "type": "object",
+      "properties": {
+        "boss": { "$ref": "#/$defs/boss" }
+      },
+      "required": ["boss"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "GFR": { "$ref": "#/$defs/minor_servo" }
+      },
+      "required": ["GFR"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "M3R": { "$ref": "#/$defs/minor_servo" }
+      },
+      "required": ["M3R"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "SRP": { "$ref": "#/$defs/tracking_minor_servo" }
+      },
+      "required": ["SRP"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "PFP": { "$ref": "#/$defs/tracking_minor_servo" }
+      },
+      "required": ["PFP"],
+      "additionalProperties": false
+    }
   ]
 }

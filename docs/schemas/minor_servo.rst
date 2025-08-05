@@ -5,10 +5,13 @@ The SRT Minor Servo schema differs from the Medicina and Noto relative schemas.
 Below you can find its definition. The Medicina and Noto definition will be
 added in the future.
 
-.. jsonschema:: ../../discos_client/schemas/srt/minor_servo.json#/$defs/boss/properties/boss
+.. jsonschema:: ../../discos_client/schemas/srt/minor_servo.json#/$defs/boss
    :hide_key: /**/$id
 
-.. jsonschema:: ../../discos_client/schemas/srt/minor_servo.json#/$defs/minor_servo/patternProperties/^(?!boss$).*
+.. jsonschema:: ../../discos_client/schemas/srt/minor_servo.json#/$defs/minor_servo
+   :hide_key: /**/$id
+
+.. jsonschema:: ../../discos_client/schemas/srt/minor_servo.json#/$defs/tracking_minor_servo
    :hide_key: /**/$id
 
 .. jsonschema:: ../../discos_client/schemas/srt/minor_servo.json#/$defs/error_code
