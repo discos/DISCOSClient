@@ -237,7 +237,7 @@ class SchemaMerger:
                     ref = obj["$ref"]
                     resolved = definitions.get(ref)
                     if not resolved:
-                        raise ValueError("Unserolved $ref: {ref}")
+                        raise ValueError(f"Unresolved $ref: {ref}")
                     merged = {
                         **resolved,
                         **{k: v for k, v in obj.items() if k != "$ref"}
