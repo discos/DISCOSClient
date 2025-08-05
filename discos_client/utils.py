@@ -224,7 +224,8 @@ class SchemaMerger:
             result = current_ref.relative_to(base_dir)
         else:
             result = ref_path
-        return f"{result}#{fragment}" if fragment else result.as_posix()
+        result = result.as_posix()
+        return f"{result}#{fragment}" if fragment else result
 
     def __expand_refs(
         self,
