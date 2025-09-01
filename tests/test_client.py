@@ -1,6 +1,7 @@
 import json
 import unittest
 import time
+import re
 from pathlib import Path
 from threading import Thread, Event
 import zmq
@@ -38,8 +39,8 @@ class TestPublisher:
             if event[0] != 1:
                 return
             topic = event[1:].decode()
-            if "_" in topic:
-                t = topic.partition("_")[-1]
+            if re.match(r"^\d{3}_.+$", topic):
+                *_, t = topic.partition("_")
                 if t in self.messages:
                     message = json.dumps(
                         self.messages[t],
