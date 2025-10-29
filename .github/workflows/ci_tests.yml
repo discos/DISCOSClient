@@ -18,20 +18,14 @@ jobs:
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ startsWith(matrix.os, 'windows') && matrix.py || format('pypy-{0}', matrix.py) }}
+        python-version: ${{ matrix.py }}
     - name: Install dependencies
       run: |
         python -m pip install ".[test]"
     - name: Run the unit tests
       shell: bash
       run: |
-        for attempt in 1 2 3; do
-          if coverage run -p -m unittest discover -b tests; then
-            exit 0
-          fi
-          sleep 2
-        done
-        exit 1
+        coverage run -p -m unittest discover -b tests
     - name: Run the Python linter
       run: |
         prospector
