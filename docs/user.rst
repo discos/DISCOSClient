@@ -1,25 +1,74 @@
 User Guide
 ==========
 
-This guide shows how to use `DISCOSClient` to read real-time telemetry data
-from INAF's single-dish radio telescopes. The client provides both synchronous
-and asynchronous interfaces, with structured data exposed as nested Python
-objects.
+This guide shows how to use :class:`~discos_client.client.DISCOSClient` to
+read real-time telemetry data from INAF's single-dish radio telescopes.
+The client provides an interface with structured data exposed as nested
+Python objects.
 
 Instantiating a Client
 ----------------------
 
-Use one of the preconfigured factories to create a client:
+The :class:`~discos_client.client.DISCOSClient` can be instantiated for
+different telescopes using predefined functions named after the supported
+observatories.
 
-- ``SRTClient`` for the Sardinia Radio Telescope
-- ``MedicinaClient`` for the Medicina Radio Telescope
-- ``NotoClient`` for the Noto Radio Telescope
-
-You can optionally provide one or more topic names to subscribe to.
+These helper functions automatically configure the network settings
+and telescope name for you, so you won't have to provide an IP address and
+port. You will only need to specify the topics you want to subscribe to.
 If no topics are specified, the client will automatically subscribe
 to all available ones for the selected telescope.
 
-To create a synchronous client for SRT:
+.. |topics| replace:: One or more topic names to subscribe to.
+.. |rettype| replace:: :class:`~discos_client.client.DISCOSClient`
+.. |return| replace:: An instance of :class:`~discos_client.client.DISCOSClient`
+
+SRTClient
+.........
+
+.. function:: SRTClient(*topics: str)
+
+   Creates a client configured for the **Sardinia Radio Telescope (SRT)**.
+
+   :param topics: |topics|
+   :type topics: str
+   :return: |return|
+   :return type: |rettype|
+
+MedicinaClient
+..............
+
+.. function:: MedicinaClient(*topics: str)
+
+   Creates a client configured for the **Medicina Radio Telescope**.
+
+   :param topics: |topics|
+   :type topics: str
+   :return: |return|
+   :return type: |rettype|
+
+NotoClient
+..........
+
+.. function:: NotoClient(*topics: str)
+
+   Creates a client configured for the **Noto Radio Telescope**.
+
+   :param topics: |topics|
+   :type topics: str
+   :return: |return|
+   :return type: |rettype|
+
+Generic DISCOSClient
+....................
+If you are working with a DISCOS environment different from the three telescope
+production lines, you might want to create an instance of a
+:class:`~discos_client.client.DISCOSClient` with a custom pair of IP address
+and port. In this case you will also need to specify the telescope line the
+DISCOS instance you are pointing to is simulating, so that all the corresponding
+schemas are correctly accessible.
+
+To create a client for the **Sardinia Radio Telescope**:
 
 .. code-block:: python
 
@@ -27,140 +76,226 @@ To create a synchronous client for SRT:
 
    SRT = SRTClient("mount", "antenna")
 
-To subscribe to all available topics:
+To create a client for the **Medicina Radio Telescope** and subscribe to all its available topics:
 
 .. code-block:: python
 
-   SRT = SRTClient()
+   MED = MedicinaClient()
 
-Reading Values
---------------
+To create a client which points to a custom instance of DISCOS, simulating the
+**Noto Radio Telescope**:
+
+.. code-block:: python
+
+   from discos_client import DISCOSClient
+
+   NOTO = DISCOSClient(address="192.168.56.200", port=16000, telescope="Noto")
+
+Direct access to values
+-----------------------
 
 Clients maintain an internal view of the most recent values for each
-subscribed topic. You can access these data at any time without blocking,
-either via dot notation or with the ``get()`` method.
-
-Using dot notation:
+subscribed topic. You can access these data directly, at any time,
+without blocking, via Python dot notation.
 
 .. code-block:: python
 
    az = SRT.mount.azimuth.currentPosition
-   
-Using the ``get()`` method:
+
+Every node of the inner structure held by the client, is a
+:class:`~discos_client.namespace.DISCOSNamespace` object
+instance. These namespace nodes are organized as a live, nested tree
+that mirrors the structure of each DISCOS telemetry topic: branches represent
+JSON objects, leaves represent primitive values (numbers, booleans, strings,
+lists). The entire tree updates in place as new messages are received.
+
+Since the whole tree is constantly updated, we provide several ways of
+accessing members, to cover different scenarios.
+
+Immutable snapshots with :meth:`~discos_client.namespace.DISCOSNamespace.copy`
+------------------------------------------------------------------------------
+
+Some application might want to access several values together, all of them
+contained in a single node or received via the same message. Since the structure
+is constantly updated, accessing different values directly as shown above might
+lead to a scenario where property 1 is read at time t0 and property 2 is read
+at time t1. In order to avoid this, a copy of the parent node can be retrieved
+with the :meth:`~discos_client.namespace.DISCOSNamespace.copy` method.
 
 .. code-block:: python
 
-   az = SRT.get("mount.azimuth.currentPosition")
-   
-To block and wait for a new message, add ``wait=True``:
+   mount = SRT.mount.copy()
+   az, el = mount.azimuth.currentPosition, mount.elevation.currentPosition
+
+Waiting for updates with :meth:`~discos_client.namespace.DISCOSNamespace.wait`
+------------------------------------------------------------------------------
+
+Sometimes you only need to check the value of a property only for changes, for
+example to check if the antenna was stowed due to high winds. The
+:meth:`~discos_client.namespace.DISCOSNamespace.wait` method comes to your help.
 
 .. code-block:: python
 
-   az = SRT.get("mount.azimuth.currentPosition", wait=True)
+   elevationMode = SRT.mount.elevation.currentMode.wait()
 
-.. note::
-
-   Calling ``get("...", wait=True)`` returns when a new message is received
-   for the requested property, regardless of whether the actual value has changed.
-
-
-Synchronous Clients
-...................
-
-Once created, the client starts receiving updates in a background thread.
-You can read values as shown in the previous section, or access the entire
-content of a topic like this:
+The code above will block until the inner value of the desired node is changed.
+Calling :meth:`~discos_client.namespace.DISCOSNamespace.wait` without any argument
+will block indefinitely, but an optional argument ``timeout`` can be provided.
 
 .. code-block:: python
 
-   antenna = SRT.get("antenna")
-   print(antenna.observedAzimuth, antenna.observedElevation)
+   elevationMode = SRT.mount.elevation.currentMode.wait(timeout=5)
 
-Asynchronous Clients
-....................
+In this example, the software waits at most for 5 seconds before returning a
+value. If the timeout expires, the current value of the node is returned,
+without it being updated.
 
-Asynchronous clients are designed to be used within Python's `asyncio`
-framework. They are ideal for applications that need to remain responsive
-while waiting for updates. You can still use the access via dot-notation as
-you've seen in the previous paragraphs, but the overall usage requires
-`asyncio` constructs such as ``await`` and an event loop.
-
-To create an asynchronous client, pass ``asynchronous=True``:
+React to updates with :meth:`~discos_client.namespace.DISCOSNamespace.bind` and :meth:`~discos_client.namespace.DISCOSNamespace.unbind`
+---------------------------------------------------------------------------------------------------------------------------------------
+The :meth:`~discos_client.namespace.DISCOSNamespace.wait` method shown above
+blocks and waits for an update of the desired node before going forward with
+code execution. If you need execution to go through, a different approach is
+needed. The :meth:`~discos_client.namespace.DISCOSNamespace.bind` method lets
+you register a callback function that will be executed when the desired value
+changes.
 
 .. code-block:: python
 
-   import asyncio
-   from discos_client import MedicinaClient
+   def printValue(value):
+       print(value)
 
-   async def main():
-       MED = MedicinaClient("antenna", asynchronous=True)
+   SRT.scheduler.tracking.bind(printValue)
+   ...
+   True
 
-       # Read current full topic
-       antenna = await MED.get("antenna")
-       print(antenna.rawAzimuth)
+The example above will call ``printValue`` and print the value of
+scheduler.tracking as soon as it changes. The three dots ... represent some
+other code that the application will continue to execute in the main thread.
 
-       # Wait for next full topic update
-       antenna = await MED.get("antenna", wait=True)
-       print(antenna.rawElevation)
+A callback registered with :meth:`~discos_client.namespace.DISCOSNamespace.bind`
+might not be needed anymore at some point in time. The
+:meth:`~discos_client.namespace.DISCOSNamespace.unbind` method is used to
+detach the callback from the given node.
 
-       # Wait for a specific field update
-       az = await MED.get("antenna.observedAzimuth", wait=True)
-       print(az)
+.. code-block:: python
 
-   asyncio.run(main())
+   def printValue(value):
+       print(value)
 
+   SRT.scheduler.tracking.bind(printValue)
+   ...
+   # callback not needed anymore, unregister it
+   SRT.scheduler.tracking.unbind(printValue)
 
-Choosing Between Sync and Async Clients
----------------------------------------
+The examples show a very minimal approach to react to an updated value. By
+implementing a more complete callback logic you can handle more complex
+scenarios.
+The :meth:`~discos_client.namespace.DISCOSNamespace.unbind` method can also
+be called without any argument. By doing so, the given
+:class:`~discos_client.namespace.DISCOSNamespace` node will unregister all
+callbacks that were previously registered to it.
 
-This section helps clarify when to use the synchronous or asynchronous
-client, based on your application's requirements. It outlines the
-strengths and limitations of each mode to support an informed choice.
+Exploiting predicates for :meth:`~discos_client.namespace.DISCOSNamespace.wait` and :meth:`~discos_client.namespace.DISCOSNamespace.bind`
+-----------------------------------------------------------------------------------------------------------------------------------------
+The :meth:`~discos_client.namespace.DISCOSNamespace.wait` and
+:meth:`~discos_client.namespace.DISCOSNamespace.bind` methods also allow a
+user to provide a predicate as an argument. This functionality allow more complex
+filtering for the new value, and can be useful for several situations. Below is
+an example of a code that is executed only whenever the elevation axis of the
+antenna gets stowed, using the :meth:`~discos_client.namespace.DISCOSNamespace.wait`
+method.
 
-When to use Synchronous Clients
-...............................
+.. code-block:: python
 
-The synchronous implementation is the most traditional and straightforward
-to use. It is recommended in non-complex contexts where asynchronous
-programming is not needed, such as:
+   SRT.mount.elevation.currentMode.wait(predicate=lambda value: value == "STOW")
+   ...
+   # send an alarm to someone that is waiting for the antenna to be stowed
 
-- your code is **sequential or blocking**
-- you're writing **simple scripts**, test procedures, or command-line tools
-- you're **not using** the `asyncio` framework
-- you prefer a **simpler interface** without `await` or event loop management
+The same principle can be applied to the
+:meth:`~discos_client.namespace.DISCOSNamespace.bind` method.
 
-When to use Asynchronous Clients
-................................
+.. code-block:: python
 
-Asynchronous clients are designed for use with Python’s `asyncio` framework.
-They are ideal when your application needs to stay responsive or handle
-multiple concurrent tasks.
+   def sendAlarm(value):
+       ...
+       # generic implementation of a function that sends an alarm via e-mail
 
-Recommended when:
+   # bind the sendAlarm function
+   SRT.receivers.SRTKBandMFReceiver.cryoTemperatureCoolHead.bind(
+      sendAlarm,
+      predicate=lambda value: value >= 30
+   )
+   ...
+   # execution of other code, the callback will be called by the client
+   # updating thread whenever a new value satisfying the predicate is
+   # received
+   ...
+   # unbind the sendAlarm function
+   SRT.receivers.SRTKBandMFReceiver.cryoTemperatureCoolHead.unbind(sendAlarm)
 
-- you're developing a **graphical interface**, e.g. using PySide or Qt
-- you're running a **web server** or interactive dashboard
-- you're building a **data pipeline** or real-time monitor
-- your environment is already using `asyncio`
+In both :meth:`~discos_client.namespace.DISCOSNamespace.bind` examples, both with
+and without a predicate, the given callback function is supposed to only receive
+one argument, shown as ``value``. The received object will always be the same
+:class:`~discos_client.namespace.DISCOSNamespace` node on which
+the :meth:`~discos_client.namespace.DISCOSNamespace.bind` method was called,
+meaning that inside the callback we can also perform the
+:meth:`~discos_client.namespace.DISCOSNamespace.unbind` operation, making
+the callback a one-time called function.
 
-Comparison Summary
-..................
+.. code-block:: python
 
-.. list-table::
-   :widths: 30 30
-   :header-rows: 1
+   def sendAlarm(value):
+       ...
+       # generic implementation of a function that sends an alarm via e-mail
+       ...
+       # now unregister the callback so that the alarm will not be sent again
+       value.unbind(sendAlarm)
 
-   * - Use case
-     - Recommended client
-   * - Simple scripts or tests
-     - synchronous
-   * - Terminal monitoring tools
-     - synchronous
-   * - GUI or interactive tools
-     - asynchronous
-   * - Web servers or dashboards
-     - asynchronous
-   * - Applications already using asyncio
-     - asynchronous
-   * - Avoiding async complexity
-     - synchronous
+   # bind the sendAlarm function
+   SRT.receivers.SRTKBandMFReceiver.cryoTemperatureCoolHead.bind(
+      sendAlarm,
+      predicate=lambda value: value >= 30
+   )
+
+In the last example, the ``sendAlarm`` callback is called once as soon as the
+newly received value for cryoTemperatureCoolHead of the SRTKBandMFReceiver is
+greater or equal to 30. As soon as the alarm logic is executed, the callback
+can be unregistered, preventing the application to send another unwanted alarm.
+
+Accessing the inner value of a :class:`~discos_client.namespace.DISCOSNamespace` object
+---------------------------------------------------------------------------------------
+Methods shown above always provide access to a
+:class:`~discos_client.namespace.DISCOSNamespace` node of the status tree. This class
+acts as a wrapper for the inner value, allowing it to be part of comparisons and
+operations just like you were working with a pure string, integer, floating point
+number or boolean value. Sometimes you would want to get rid of the
+:class:`~discos_client.namespace.DISCOSNamespace` wrapper and work with the inner
+value. In order to retrieve it the
+:class:`~discos_client.namespace.DISCOSNamespace` class offers a method called
+:meth:`~discos_client.namespace.DISCOSNamespace.get_value`.
+
+.. code-block:: python
+
+   projectCode = SRT.scheduler.projectCode
+   # projectCode is a DISCOSNamespace object
+   projectCode = SRT.scheduler.projectCode.get_value()
+   # projectCode is now a pure str object
+
+Most of the times you won't need to access inner value, but for more complex
+operations, sometimes your Python distribution might raise some exceptions when
+using a :class:`~discos_client.namespace.DISCOSNamespace` object
+as indexer for a list or a dictionary. In case you bump into some weird behavior,
+try using :meth:`~discos_client.namespace.DISCOSNamespace.get_value`. You will
+also benefit in case you need to work with a fixed value and avoid the continuous
+updating of a :class:`~discos_client.namespace.DISCOSNamespace` node.
+
+Tips and best practices
+-----------------------
+
+* Use :meth:`~discos_client.namespace.DISCOSNamespace.copy` or
+  :meth:`~discos_client.namespace.DISCOSNamespace.get_value` before doing long
+  processing so that the value stays the same
+* Always unregister callbacks you no longer need with
+  :meth:`~discos_client.namespace.DISCOSNamespace.unbind` so that code is not
+  executed when is no longer needed
+* Refer to the :class:`~discos_client.namespace.DISCOSNamespace` class for more details.

@@ -1,3 +1,5 @@
+.. _schemas:
+
 Messages JSON Schemas
 =====================
 
@@ -19,6 +21,7 @@ More details regarding each schema can be found in the following sections.
    definitions
    scheduler
    antenna
+   active_surface
    receivers
    weather
    mount

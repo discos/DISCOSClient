@@ -81,7 +81,7 @@
         "channels": {
           "type": "array",
           "title": "Channels",
-          "description": "List of receiver's channelss.",
+          "description": "List of receiver's channels.",
           "items": {
             "$ref": "#/$defs/channel"
           }
@@ -173,7 +173,7 @@
     {
       "type": "object",
       "patternProperties": {
-        "^(?!boss$).*": { "$ref": "#/$defs/receiver" }
+        "^(?!boss$)[A-Za-z0-9_]+$": { "$ref": "#/$defs/receiver" }
       },
       "minProperties": 1,
       "maxProperties": 1,

@@ -5,7 +5,7 @@ DEFAULT_PORT = 16000
 
 SRTClient = partial(
     DISCOSClient,
-    address="192.168.200.204",
+    address="192.168.200.203",
     port=DEFAULT_PORT,
     telescope="SRT"
 )

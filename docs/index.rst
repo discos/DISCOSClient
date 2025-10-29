@@ -7,8 +7,8 @@ Italian Single-dish COntrol System) infrastructure. This system is used by
 INAF telescopes such as the Sardinia Radio Telescope (SRT), the Medicina Radio
 Telescope, and the Noto Radio Telescope.
 
-The library provides both synchronous and asynchronous interfaces for accessing
-the internal state of telescope components such as the `antenna`, `mount`, etc.
+The library provides an interface for accessing the internal state of telescope
+components such as the `antenna`, `mount`, etc.
 It is designed to be minimal, thread-safe, and self-describing via JSON schemas.
 
 DISCOSClient is built on top of `ZeroMQ <https://zeromq.org/>`_, a
@@ -22,8 +22,6 @@ Key Features
 ------------
 
 - Subscribe to one or multiple topics (e.g., `mount`, `antenna`)
-- Available in both **synchronous** and **asynchronous** variants
-  (`SyncClient`, `AsyncClient`)
 - Automatically decodes incoming JSON messages into nested Python namespaces
 - Supports both blocking and non-blocking access to telemetry data
 - Cross-platform: works on Linux, macOS, and Windows
@@ -42,24 +40,22 @@ The main goals of `DISCOSClient` are:
 Overview
 --------
 
-The library exposes a main factory class `DISCOSClient`, along with three
-preconfigured partial factories for convenience:
+The library exposes a main class `DISCOSClient` in order to access the telescope
+telemetry, along with three pre-configured classes, one for each telescope:
 
-- `SRTClient` for the Sardinia Radio Telescope
-- `MedicinaClient` for the Medicina Radio Telescope
-- `NotoClient` for the Noto Radio Telescope
+- `SRTClient` to access telemetry data from the Sardinia Radio Telescope
+- `MedicinaClient` to access telemetry data from the Medicina Radio Telescope
+- `NotoClient` to access telemetry data from the Noto Radio Telescope
 
-These partial clients simplify the setup by pre-filling the `telescope`
-and `address` arguments, making it easier to instantiate clients for the
-corresponding observatory:
+These partial clients simplify the setup by pre-filling the `telescope`, `address`
+and `port` arguments, making it easier to instantiate clients for the corresponding
+observatory.
 
 Internally, each client instance manages a subscription socket and a background
-thread (for `SyncClient`) or coroutine (for `AsyncClient`) that continuously
-listens for messages published by the telescope systems.
+thread that continuously listens for messages published by the telescope systems.
 
 Incoming JSON messages are automatically parsed and stored as structured Python
-objects, which can be queried, watched, or awaited depending on the client's
-mode.
+objects, which can be queried or watched.
 
 For further details, installation instructions, and usage examples, see the
 sections below.
