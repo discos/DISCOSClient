@@ -215,10 +215,10 @@
           "title": "Axes",
           "description": "Minor servo axes information.",
           "patternProperties": {
-            "^T[A-Z]+$": {
+            "^T[XYZ]$": {
               "$ref": "#/$defs/translation_axis_info"
             },
-            "^R[A-Z]+$": {
+            "^R(?:[XYZ]|THETA)$": {
               "$ref": "#/$defs/rotation_axis_info"
             }
           }

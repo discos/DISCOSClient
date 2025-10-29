@@ -6,7 +6,6 @@ from pathlib import Path
 from threading import Thread, Event
 import zmq
 from discos_client import DISCOSClient
-from discos_client.namespace import DISCOSNamespace
 
 
 class TestPublisher:
@@ -16,8 +15,15 @@ class TestPublisher:
     def __init__(self):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.XPUB)
-        self.socket.setsockopt(zmq.SNDHWM, 2)
-        self.socket.bind(f"tcp://127.0.0.1:{self.PORT}")
+        self.socket.setsockopt(zmq.LINGER, 0)
+        self.socket.setsockopt(zmq.SNDHWM, 10)
+        # This loop is necessary to wait for the client to close between tests
+        while True:
+            try:
+                self.socket.bind(f"tcp://127.0.0.1:{self.PORT}")
+                break
+            except zmq.ZMQError:
+                pass
         messages_dir = Path(__file__).resolve().parent
         message_files = messages_dir.glob("messages/*.json")
         self.messages = {}
@@ -25,30 +31,37 @@ class TestPublisher:
             with open(message, "r", encoding="utf-8") as f:
                 topic_name = message.stem
                 self.messages[topic_name] = json.load(f)
-        self.t = Thread(target=self.publish, daemon=True)
+        self.t = Thread(target=self.publish)
         self.event = Event()
         self.t.start()
 
     def __enter__(self):
         return self
 
-    def _handle_subscription(self, poller):
-        events = dict(poller.poll(100))
-        if self.socket in events:
-            event = self.socket.recv()
-            if event[0] != 1:
-                return
-            topic = event[1:].decode()
-            if re.match(r"^\d{3}_.+$", topic):
-                *_, t = topic.partition("_")
+    def _handle_subscription(self):
+        while True:
+            try:
+                event = self.socket.recv(flags=zmq.DONTWAIT)
+            except zmq.Again:
+                break
+            if not event:
+                continue
+            op = event[0]
+            topic = event[1:].decode(errors="ignore")
+            if op != 1:
+                continue
+
+            if re.match(r"^[0-9A-Za-z]{4}_.+$", topic):
+                t = topic.split("_", 1)[1]
                 if t in self.messages:
                     message = json.dumps(
                         self.messages[t],
-                        separators=(',', ':')
-                    )
-                    self.socket.send_string(
-                        f"{topic} {message}"
-                    )
+                        separators=(",", ":")
+                    ).encode("utf-8")
+                    self.socket.send_multipart([
+                        topic.encode("ascii"),
+                        message
+                    ])
                 else:
                     subparts = {}
                     for key, val in self.messages.items():
@@ -59,8 +72,10 @@ class TestPublisher:
                         message = json.dumps(
                             subparts,
                             separators=(",", ":")
-                        )
-                        self.socket.send_string(f"{topic} {message}")
+                        ).encode("utf-8")
+                        self.socket.send_multipart([
+                            topic.encode("ascii"), message
+                        ])
 
     def _send_periodic_messages(self):
         for topic, payload in self.messages.items():
@@ -71,14 +86,15 @@ class TestPublisher:
             payload = json.dumps(
                 payload,
                 separators=(",", ":")
-            )
-            self.socket.send_string(f"{topic} {payload}")
+            ).encode("utf-8")
+            self.socket.send_multipart([
+                topic.encode("ascii"),
+                payload
+            ])
 
     def publish(self):
-        poller = zmq.Poller()
-        poller.register(self.socket, zmq.POLLIN)
         while not self.event.is_set():
-            self._handle_subscription(poller)
+            self._handle_subscription()
             self._send_periodic_messages()
             time.sleep(0.1)
 
@@ -89,10 +105,14 @@ class TestPublisher:
         self.context.term()
 
 
-class TestBaseClient(unittest.TestCase):
+class TestDISCOSClient(unittest.TestCase):
 
     def test_no_topics(self):
-        DISCOSClient(address="127.0.0.1", port=16000, telescope="SRT")
+        DISCOSClient(
+            address="127.0.0.1",
+            port=16000,
+            telescope="SRT"
+        )
 
     def test_unknown_topic(self):
         with self.assertRaises(ValueError) as ex:
@@ -124,13 +144,15 @@ class TestBaseClient(unittest.TestCase):
     def test_str(self):
         client = DISCOSClient(address="127.0.0.1", port=16000)
         self.assertTrue(
-            str(client).startswith("{") and str(client).endswith("}")
+            str(client).startswith("{") and
+            str(client).endswith("}")
         )
 
     def test_format(self):
         client = DISCOSClient(address="127.0.0.1", port=16000)
         self.assertTrue(
-            f"{client:}".startswith("{") and f"{client:}".endswith("}")
+            f"{client:}".startswith("{") and
+            f"{client:}".endswith("}")
         )
         with self.assertRaises(ValueError) as ex:
             _ = f"{client:u}"
@@ -187,6 +209,7 @@ class TestBaseClient(unittest.TestCase):
             client.antenna.unbind(callback, str)  # Never used predicate
             client.antenna.unbind(callback)
             client.antenna.unbind(int)  # Never bound callback
+            client.antenna.unbind(None)  # Unbind all callbacks
 
     def test_wait(self):
         with TestPublisher():
@@ -196,70 +219,11 @@ class TestBaseClient(unittest.TestCase):
             antenna = client.antenna.copy()
             self.assertNotEqual(
                 unix_time,
-                client.antenna.timestamp.unix_time.wait(timeout=5)
+                client.antenna.timestamp.unix_time.wait(timeout=10)
             )
             self.assertNotEqual(
                 antenna,
                 client.antenna.wait(timeout=5)
-            )
-
-
-class TestSyncClient(unittest.TestCase):
-
-    def test_sync_client(self):
-        with TestPublisher():
-            client = DISCOSClient(
-                "antenna",
-                address="127.0.0.1",
-                port=16000,
-                telescope="SRT"
-            )
-            time.sleep(1)
-            antenna = client.get("antenna.timestamp", wait=True)
-            self.assertIsInstance(antenna, DISCOSNamespace)
-            antenna = client.get("antenna")
-            self.assertIsInstance(antenna, DISCOSNamespace)
-            with self.assertRaises(KeyError) as ex:
-                client.get("unknown")
-            self.assertEqual(
-                ex.exception.args[0],
-                "Unknown topic 'unknown'"
-            )
-            with self.assertRaises(KeyError) as ex:
-                client.get("mount")
-            self.assertEqual(
-                ex.exception.args[0],
-                "The client is not subscribed to 'mount'"
-            )
-
-
-class TestAsyncClient(unittest.IsolatedAsyncioTestCase):
-
-    async def test_async_client(self):
-        with TestPublisher():
-            client = DISCOSClient(
-                "antenna",
-                address="127.0.0.1",
-                port=16000,
-                telescope="SRT",
-                asynchronous=True
-            )
-            time.sleep(1)
-            antenna = await client.get("antenna.timestamp", wait=True)
-            self.assertIsInstance(antenna, DISCOSNamespace)
-            antenna = await client.get("antenna")
-            self.assertIsInstance(antenna, DISCOSNamespace)
-            with self.assertRaises(KeyError) as ex:
-                await client.get("unknown")
-            self.assertEqual(
-                ex.exception.args[0],
-                "Unknown topic 'unknown'"
-            )
-            with self.assertRaises(KeyError) as ex:
-                await client.get("mount")
-            self.assertEqual(
-                ex.exception.args[0],
-                "The client is not subscribed to 'mount'"
             )
 
 

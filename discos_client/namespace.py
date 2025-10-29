@@ -109,7 +109,7 @@ class DISCOSNamespace:
 
     def unbind(
         self,
-        callback: Callable[[DISCOSNamespace], None],
+        callback: Callable[[DISCOSNamespace], None] | None = None,
         predicate: Callable[[DISCOSNamespace], bool] = None
     ) -> None:
         """
@@ -122,6 +122,9 @@ class DISCOSNamespace:
                           removed.
         """
         with self._observers_lock:
+            if callback is None:
+                self._observers.clear()
+                return
             if callback not in self._observers:
                 return
             if predicate is not None:
@@ -132,7 +135,7 @@ class DISCOSNamespace:
     def wait(
         self,
         predicate: Callable[[DISCOSNamespace], bool] = None,
-        timeout: float = None
+        timeout: float | None = None
     ) -> DISCOSNamespace:
         """
         Block until the DISCOSNamespace triggers a change notification.
@@ -633,5 +636,5 @@ with optional indentation level <n> (default is 2)
             value = self._value
             if DISCOSNamespace.__is__(value):
                 attrs.discard("get_value")
-            attrs.update(dir(value))
+            attrs = set(dir(value)).union(attrs)
         return sorted(attrs)

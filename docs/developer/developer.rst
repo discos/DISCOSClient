@@ -8,6 +8,5 @@ for testing and code quality checks.
 .. toctree::
    :maxdepth: 2
 
-   testing
-   clients
+   contributing
    inner_classes

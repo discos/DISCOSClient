@@ -8,3 +8,15 @@ ignore-paths:
   - build
   - examples
   - docs
+
+pylint:
+  disable:
+    - protected-access
+    - too-many-arguments
+    - too-many-instance-attributes
+    - too-many-locals
+    - too-many-positional-arguments
+
+mccabe:
+  disable:
+    - MC0001
