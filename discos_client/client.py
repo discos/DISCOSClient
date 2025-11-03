@@ -7,7 +7,7 @@ from collections import defaultdict
 from typing import Any, cast, Tuple, Dict
 import zmq
 from .namespace import DISCOSNamespace
-from .utils import rand_id, SchemaMerger
+from .utils import rand_id, SchemaMerger, ignore_sigint
 
 
 class DISCOSClient:
@@ -37,7 +37,7 @@ class DISCOSClient:
         self._waiting = defaultdict(list)
         self._waiting_lock = threading.Lock()
         self._locks = defaultdict(threading.Lock)
-        self._pool = ProcessPoolExecutor()
+        self._pool = ProcessPoolExecutor(initializer=ignore_sigint)
         self._context = zmq.Context()
         self._socket = self._context.socket(zmq.SUB)
         self._socket.setsockopt(zmq.LINGER, 0)

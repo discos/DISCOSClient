@@ -4,6 +4,7 @@ import json
 import operator
 import secrets
 import string
+import signal
 from pathlib import Path
 from typing import Any, Callable, TYPE_CHECKING
 from importlib.resources import files
@@ -21,7 +22,8 @@ __all__ = [
     "delegated_operations",
     "delegated_comparisons",
     "public_dict",
-    "SchemaMerger"
+    "SchemaMerger",
+    "ignore_sigint"
 ]
 
 
@@ -561,3 +563,7 @@ class SchemaMerger:
 
     def get_topics(self) -> list[str]:
         return list(self.node_to_id.keys())
+
+
+def ignore_sigint():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
