@@ -20,11 +20,11 @@
     },
     "type": {
       "type": "string",
-      "description": "JSON Schema type of the value (e.g., number, integer, string)."
+      "description": "JSON Schema type of the value (e.g., number, boolean, string)."
     },
     "format": {
       "type": "string",
-      "description": "Optional JSON Schema format annotation (e.g., int64, date-time)."
+      "description": "Optional JSON Schema format annotation (e.g., date-time)."
     },
     "enum": {
       "type": "string",
