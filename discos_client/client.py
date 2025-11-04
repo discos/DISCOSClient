@@ -219,16 +219,34 @@ class DISCOSClient:
             | '<n>i' - indented JSON \
 with optional indentation level <n> (default is 2)
             | 'f' - full representation with metadata
+            | 'm' - metadata only representation
 
         :return: A JSON formatted string.
         """
-        fmt_spec = spec[1:] if spec.startswith("f") else spec
-        fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("f") else fmt_spec
+        has_f = "f" in spec
+        has_m = "m" in spec
+
+        if has_f and has_m:
+            raise ValueError(
+                "Format specifier cannot contain both 'f' and 'm'."
+            )
+
+        if has_f:
+            fmt_spec = spec[1:] if spec.startswith("f") else spec
+            fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("f") else fmt_spec
+        elif has_m:
+            fmt_spec = spec[1:] if spec.startswith("m") else spec
+            fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("m") else fmt_spec
+        else:
+            fmt_spec = spec
 
         indent = None
         separators = None
-        default = DISCOSNamespace.__full_dict__ if fmt_spec != spec \
+        default = (
+            DISCOSNamespace.__full_dict__ if has_f
+            else DISCOSNamespace.__metadata_dict__ if has_m
             else DISCOSNamespace.__message_dict__
+        )
 
         if fmt_spec == "":
             pass

@@ -167,7 +167,7 @@ class TestDISCOSNamespace(unittest.TestCase):
         a = 1.234
         ns = DISCOSNamespace(value=a)
         self.assertEqual(f"{ns:.3f}", f"{a:.3f}")
-        b = {"a": a, "enum": ["a", "b"]}
+        b = {"a": {"title": "a", "value": a}, "enum": ["a", "b"]}
         ns = DISCOSNamespace(**b)
         with self.assertRaises(ValueError) as ex:
             _ = f"{ns:.3f}"
@@ -185,6 +185,12 @@ class TestDISCOSNamespace(unittest.TestCase):
             str(ex.exception),
             "Unknown format code '3c' for DISCOSNamespace"
         )
+        with self.assertRaises(ValueError) as ex:
+            _ = f"{ns:fm}"
+        self.assertEqual(
+            str(ex.exception),
+            "Format specifier cannot contain both 'f' and 'm'."
+        )
         self.assertEqual(
             f"{ns:i}",
             json.dumps({"a": a}, indent=2)
@@ -192,6 +198,12 @@ class TestDISCOSNamespace(unittest.TestCase):
         self.assertEqual(
             f"{ns:f}",
             json.dumps(b)
+        )
+        b_ = deepcopy(b)
+        b_["a"].pop("value")
+        self.assertEqual(
+            f"{ns:m}",
+            json.dumps(b_)
         )
         for indent in range(1, 10):
             self.assertEqual(

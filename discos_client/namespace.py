@@ -4,7 +4,8 @@ import threading
 from copy import deepcopy
 from collections.abc import Iterable
 from typing import Any, Callable, Iterator
-from .utils import delegated_operations, delegated_comparisons, public_dict
+from .utils import delegated_operations, delegated_comparisons
+from .utils import public_dict, META_KEYS
 
 
 __all__ = ["DISCOSNamespace"]
@@ -23,12 +24,6 @@ class DISCOSNamespace:
 
     __typename__ = "DISCOSNamespace"
     __private__ = (
-        "type",
-        "title",
-        "description",
-        "enum",
-        "unit",
-        "format",
         "_lock",
         "_observers",
         "_observers_lock",
@@ -429,6 +424,7 @@ class DISCOSNamespace:
             | '<n>i' - indented JSON \
 with optional indentation level <n> (default is 2)
             | 'f' - full representation with metadata
+            | 'm' - metadata only representation
 
         :return: A JSON formatted string.
         :raise ValueError: If the format specifier is unknown or malformed.
@@ -437,13 +433,30 @@ with optional indentation level <n> (default is 2)
             with self._lock:
                 return format(self._value, spec)
 
-        fmt_spec = spec[1:] if spec.startswith("f") else spec
-        fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("f") else fmt_spec
+        has_f = "f" in spec
+        has_m = "m" in spec
+
+        if has_f and has_m:
+            raise ValueError(
+                "Format specifier cannot contain both 'f' and 'm'."
+            )
+
+        if has_f:
+            fmt_spec = spec[1:] if spec.startswith("f") else spec
+            fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("f") else fmt_spec
+        elif has_m:
+            fmt_spec = spec[1:] if spec.startswith("m") else spec
+            fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("m") else fmt_spec
+        else:
+            fmt_spec = spec
 
         indent = None
         separators = None
-        default = \
-            self.__full_dict__ if fmt_spec != spec else self.__message_dict__
+        default = (
+            self.__full_dict__ if has_f
+            else self.__metadata_dict__ if has_m
+            else self.__message_dict__
+        )
 
         if fmt_spec == "":
             pass
@@ -555,7 +568,7 @@ with optional indentation level <n> (default is 2)
                     return unwrap(cls.__get_value__(value))
                 retval = {}
                 for k, v in vars(value).items():
-                    if k in cls.__private__:
+                    if k in cls.__private__ or k in META_KEYS:
                         continue
                     retval[k] = unwrap(v)
                 return retval
@@ -563,6 +576,24 @@ with optional indentation level <n> (default is 2)
                 return [unwrap(v) for v in value]
             return value
         return unwrap(obj)
+
+    @classmethod
+    def __metadata_dict__(cls, obj: DISCOSNamespace) -> dict[str, Any]:
+        """
+        Return only the metadata dictionary, removing pure message values.
+
+        :param obj: The object to convert.
+        :return: A dictionary containing only schema/metadata fields.
+        """
+        def strip(value: Any) -> Any:
+            if isinstance(value, dict):
+                return {
+                    k: strip(v) for k, v in value.items() if k != "value"
+                }
+            if isinstance(value, (list, tuple)):
+                return [strip(v) for v in value]
+            return value
+        return strip(public_dict(obj, cls.__is__, cls.__get_value__))
 
     @classmethod
     def __value_repr__(cls, obj: Any) -> Any:

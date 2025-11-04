@@ -167,6 +167,18 @@ class TestDISCOSClient(unittest.TestCase):
             "Unknown format code '.3f' for DISCOSClient"
         )
         with self.assertRaises(ValueError) as ex:
+            _ = f"{client:.3m}"
+        self.assertEqual(
+            str(ex.exception),
+            "Unknown format code '.3m' for DISCOSClient"
+        )
+        with self.assertRaises(ValueError) as ex:
+            _ = f"{client:fm}"
+        self.assertEqual(
+            str(ex.exception),
+            "Format specifier cannot contain both 'f' and 'm'."
+        )
+        with self.assertRaises(ValueError) as ex:
             _ = f"{client:0i}"
         self.assertEqual(
             str(ex.exception),
