@@ -5,7 +5,8 @@ from copy import deepcopy
 from collections.abc import Iterable
 from typing import Any, Callable, Iterator
 from .utils import delegated_operations, delegated_comparisons
-from .utils import public_dict, META_KEYS
+from .utils import public_dict
+from .merger import META_KEYS
 
 
 __all__ = ["DISCOSNamespace"]
@@ -393,23 +394,22 @@ class DISCOSNamespace:
         :param other: Another DISCOSNamespace or compatible object.
         :return: Self after the merge.
         """
-        if self == other:
+        if self is other:
             return self
 
         for k, ov in vars(other).items():
             if k.startswith("_") and k != "_value":
                 continue
 
-            sv = getattr(self, k, None)
+            sv = self.__dict__.get(k, None)
 
             if DISCOSNamespace.__is__(sv) and DISCOSNamespace.__is__(ov):
                 sv <<= ov
             else:
                 if ov == sv:
                     continue
-                new = deepcopy(ov)
                 with self._lock:
-                    object.__setattr__(self, k, new)
+                    object.__setattr__(self, k, ov)
 
         self.__notify__()
         return self

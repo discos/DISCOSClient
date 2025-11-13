@@ -157,8 +157,14 @@ class TestDISCOSNamespace(unittest.TestCase):
             "DISCOSNamespace object is not iterable"
         )
 
-    def test_deepcopy(self):
+    def test_copy(self):
         d = {"a": {"b": "a"}}
+        ns = DISCOSNamespace(**d)
+        ns2 = ns.copy()
+        self.assertFalse(ns2 is ns)
+
+    def test_deepcopy(self):
+        d = {"a": {"b": {"value": ["a", "b"]}}}
         ns = DISCOSNamespace(**d)
         ns2 = deepcopy(ns)
         self.assertFalse(ns2 is ns)
@@ -263,6 +269,7 @@ class TestDISCOSNamespace(unittest.TestCase):
         self.assertEqual(ns.a, "b")
         self.assertEqual(ns._a, "a")  # noqa
         self.assertFalse(ns is ns2)
+        ns <<= ns  # Should return immediately and do nothing
 
     def test_comparison(self):
         a = 2
@@ -289,6 +296,12 @@ class TestDISCOSNamespace(unittest.TestCase):
     def test_getattr(self):
         ns = DISCOSNamespace(value="foo")
         self.assertEqual(ns.upper(), "foo".upper())
+        with self.assertRaises(AttributeError) as ex:
+            _ = ns.unknown
+        self.assertEqual(
+            str(ex.exception),
+            "'DISCOSNamespace' object has no attribute 'unknown'"
+        )
 
     def test_get_value(self):
         ns = DISCOSNamespace(value="foo")

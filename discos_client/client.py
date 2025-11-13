@@ -4,10 +4,11 @@ import threading
 import weakref
 from concurrent.futures import ProcessPoolExecutor, Future
 from collections import defaultdict
-from typing import Any, cast, Tuple, Dict
+from typing import Any, Tuple, Dict
 import zmq
 from .namespace import DISCOSNamespace
-from .utils import rand_id, SchemaMerger, ignore_sigint
+from .utils import rand_id, initialize_worker
+from .merger import SchemaMerger
 
 
 class DISCOSClient:
@@ -33,11 +34,14 @@ class DISCOSClient:
         """
         self_ref = weakref.ref(self)
         self._client_id = rand_id()
-        self._schema_merger = SchemaMerger(telescope)
+        merger = SchemaMerger(telescope)
         self._waiting = defaultdict(list)
         self._waiting_lock = threading.Lock()
         self._locks = defaultdict(threading.Lock)
-        self._pool = ProcessPoolExecutor(initializer=ignore_sigint)
+        self._pool = ProcessPoolExecutor(
+            initializer=initialize_worker,
+            initargs=(telescope,)
+        )
         self._context = zmq.Context()
         self._socket = self._context.socket(zmq.SUB)
         self._socket.setsockopt(zmq.LINGER, 0)
@@ -55,7 +59,7 @@ class DISCOSClient:
             self._socket,
             self._context,
         )
-        valid_topics = self._schema_merger.get_topics()
+        valid_topics = merger.get_topics()
         invalid = [t for t in topics if t not in valid_topics]
         if invalid:
             if len(invalid) > 1:
@@ -70,11 +74,11 @@ class DISCOSClient:
                 f"'{valid_topics[-1]}'"
             )
         if not topics:
-            topics = self._schema_merger.get_topics()
+            topics = merger.get_topics()
         self._topics = list(topics)
         for t in self._topics:
             self.__update_namespace__(t, DISCOSNamespace(
-                **self._schema_merger.merge_schema(t, {})
+                **merger.merge_schema(t, {})
             ))
             self._socket.subscribe(f'{self._client_id}{t}')
         self._recv_thread.start()
@@ -108,10 +112,9 @@ class DISCOSClient:
             self = self_ref()
             if self is None:
                 break
-            self = cast("DISCOSClient", self)
             try:
-                message = self._socket.recv_multipart()
-                topic, payload = message[0].decode("ascii"), message[1]
+                topic, payload = self._socket.recv_multipart(copy=False)
+                topic = memoryview(topic).tobytes().decode("ascii")
                 if topic.startswith(self._client_id):
                     self._socket.unsubscribe(topic)
                     topic = topic[len(self._client_id):]
@@ -119,8 +122,7 @@ class DISCOSClient:
                 fut = self._pool.submit(
                     DISCOSClient.__merge_task__,
                     topic,
-                    payload,
-                    self._schema_merger
+                    payload.bytes
                 )
                 fut.add_done_callback(
                     lambda f, w=self_ref: DISCOSClient.__update_task__(w, f)
@@ -140,18 +142,19 @@ class DISCOSClient:
     @staticmethod
     def __merge_task__(
         topic: str,
-        payload: bytes,
-        merger: SchemaMerger
+        payload: memoryview
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Performs the merging between payload and schema. This task can be very
         CPU expensive, therefore it is executed as a separate process.
 
-        :param topic:
-        :param payload:
-        :param merger:
+        :param topic: The topic on which the payload was received.
+        :param payload: The memoryview object that points to the ZMQ payload.
         """
-        return topic, merger.merge_schema(topic, json.loads(payload))
+        return topic, SchemaMerger.get_instance().merge_schema(
+            topic,
+            json.loads(payload)
+        )
 
     @staticmethod
     def __update_task__(
@@ -167,7 +170,6 @@ class DISCOSClient:
         self = self_ref()
         if self is None:
             return
-        self = cast("DISCOSClient", self)
         try:
             topic, payload = fut.result()
             payload = DISCOSNamespace(**payload)
@@ -286,6 +288,14 @@ with optional indentation level <n> (default is 2)
         :return: A dictionary containing the pairs of topics and
                  DISCOSNamespaces with last received statuses
         """
-        return dict(filter(
-            lambda item: item[0] in self._topics, self.__dict__.items()
-        ))
+        result: dict[str, DISCOSNamespace] = {}
+        topics = sorted(self._topics)
+        for topic in topics:
+            self._locks[topic].acquire()
+        for topic in topics:
+            ns = self.__dict__.get(topic)
+            if ns is not None:
+                result[topic] = ns
+        for topic in topics:
+            self._locks[topic].release()
+        return result
