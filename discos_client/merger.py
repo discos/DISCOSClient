@@ -1,16 +1,18 @@
 from __future__ import annotations
 import re
 import json
+import signal
 from pathlib import Path
 from typing import Any
 from importlib.resources import files
 from collections.abc import Iterable
+from .utils import META_KEYS
+from .namespace import DISCOSNamespace
 
-
-META_KEYS = ("type", "title", "description", "format", "unit", "enum")
 
 __all__ = [
     "SchemaMerger",
+    "initialize_worker"
 ]
 
 
@@ -22,33 +24,37 @@ class SchemaMerger:
         self._pp_cache: \
             dict[int, list[tuple[str, "re.Pattern", str, dict]]] = {}
         self.schemas, definitions, self.node_to_id = \
-            self.__load_schemas(base_dir, telescope)
+            self._load_schemas(base_dir, telescope)
 
         for def_id, definition in definitions.items():
-            definition = self.__absolutize_refs(definition, base_dir, def_id)
-            definition = self.__expand_refs(definition, definitions)
-            definition = self.__merge_all_of(definition)
-            self.__precompile_patternprops(definition)
+            definition = self._absolutize_refs(definition, base_dir, def_id)
+            definition = self._expand_refs(definition, definitions)
+            definition = self._merge_all_of(definition)
+            self._precompile_patternprops(definition)
             definitions[def_id] = definition
 
         for schema_id, schema in self.schemas.items():
-            schema = self.__absolutize_refs(schema, base_dir, schema_id)
-            schema = self.__expand_refs(schema, definitions)
-            schema = self.__merge_all_of(schema)
+            schema = self._absolutize_refs(schema, base_dir, schema_id)
+            schema = self._expand_refs(schema, definitions)
+            schema = self._merge_all_of(schema)
             schema.pop("$defs", None)
-            self.__precompile_patternprops(schema)
+            self._precompile_patternprops(schema)
             self.schemas[schema_id] = schema
 
     def merge_schema(
         self,
-        name: str,
-        message: dict[str, Any]
+        topic: str,
+        payload: bytes | None = None
     ) -> dict[str, Any]:
-        if name not in self.node_to_id:  # pragma: no cover
-            raise ValueError(f"Schema '{name}' was not loaded.")
-        name = self.node_to_id[name]
-        schema = self.schemas[name]
-        return self._enrich_object(schema, message)
+        if topic not in self.node_to_id:  # pragma: no cover
+            raise ValueError(f"Schema '{topic}' was not loaded.")
+        topic = self.node_to_id[topic]
+        schema = self.schemas[topic]
+        if not payload:
+            payload = self._enrich_object(schema, {})
+        else:
+            payload = self._enrich_object(schema, json.loads(payload))
+        return DISCOSNamespace(**payload)
 
     def _literal_prefix(self, pat: str) -> str:
         i = 0
@@ -64,16 +70,16 @@ class SchemaMerger:
             i += 1
         return ''.join(out)
 
-    def __precompile_patternprops(self, obj: dict | list) -> None:
-        for d in self.__walk_dicts(obj):
+    def _precompile_patternprops(self, obj: dict | list) -> None:
+        for d in self._walk_dicts(obj):
             pp = d.get("patternProperties")
             if not isinstance(pp, dict) or not pp:
                 continue
             key = id(pp)
             if key not in self._pp_cache:
-                self._pp_cache[key] = self.__build_pp_list(pp)
+                self._pp_cache[key] = self._build_pp_list(pp)
 
-    def __walk_dicts(self, root: dict | list) -> Iterable[dict]:
+    def _walk_dicts(self, root: dict | list) -> Iterable[dict]:
         stack: list[dict | list] = [root]
         while stack:
             cur = stack.pop()
@@ -87,7 +93,7 @@ class SchemaMerger:
                     if isinstance(v, (dict, list)):
                         stack.append(v)
 
-    def __build_pp_list(
+    def _build_pp_list(
         self,
         pp: dict
     ) -> list[tuple[str, re.Pattern | None, str, dict]]:
@@ -101,7 +107,7 @@ class SchemaMerger:
             compiled.append((pat, rx, pref, pschema))
         return compiled
 
-    def __load_schemas(
+    def _load_schemas(
         self,
         base_dir: Path,
         telescope: str | None
@@ -119,7 +125,7 @@ class SchemaMerger:
             if f.is_file() and f.name.endswith(".json"):
                 rel_path = f.resolve().relative_to(base_dir).as_posix()
                 schema = json.loads(f.read_text(encoding="utf-8"))
-                self.__absolutize_refs(schema, base_dir, rel_path)
+                self._absolutize_refs(schema, base_dir, rel_path)
                 schema_id = schema.get("$id", rel_path)
                 definitions[schema_id] = schema
         for d in schemas_dirs:
@@ -128,7 +134,7 @@ class SchemaMerger:
                     rel_path = \
                         f.resolve().relative_to(base_dir).as_posix()
                     schema = json.loads(f.read_text(encoding="utf-8"))
-                    self.__absolutize_refs(schema, base_dir, rel_path)
+                    self._absolutize_refs(schema, base_dir, rel_path)
                     schema_id = schema.get("$id", rel_path)
                     node_name = schema.get("node")
                     if not node_name:  # pragma: no cover
@@ -139,7 +145,7 @@ class SchemaMerger:
                         definitions[f"{schema_id}#/$defs/{k}"] = v
         return schemas, definitions, node_to_id
 
-    def __absolutize_refs(
+    def _absolutize_refs(
         self,
         schema: dict[str, Any],
         base_dir: Path,
@@ -148,7 +154,7 @@ class SchemaMerger:
         def recurse(obj: Any):
             if isinstance(obj, dict):
                 if "$ref" in obj:
-                    obj["$ref"] = self.__normalize_ref(
+                    obj["$ref"] = self._normalize_ref(
                         obj["$ref"],
                         base_dir,
                         Path(current_file)
@@ -161,7 +167,7 @@ class SchemaMerger:
         recurse(schema)
         return schema
 
-    def __normalize_ref(
+    def _normalize_ref(
         self,
         ref: str,
         base_dir: Path,
@@ -183,7 +189,7 @@ class SchemaMerger:
         result = result.as_posix()
         return f"{result}#{fragment}" if fragment else result
 
-    def __expand_refs(
+    def _expand_refs(
         self,
         schema: dict[str, Any],
         definitions: dict[str, Any]
@@ -206,7 +212,7 @@ class SchemaMerger:
             return obj
         return recurse(schema)
 
-    def __merge_all_of(self, schema: dict[str, Any]) -> dict[str, Any]:
+    def _merge_all_of(self, schema: dict[str, Any]) -> dict[str, Any]:
         def recurse(obj: Any):
             if isinstance(obj, dict):
                 if "allOf" in obj:
@@ -226,7 +232,7 @@ class SchemaMerger:
         merged: dict[str, Any] = {}
         required_fields: set[str] = set()
         for subschema in subschemas:
-            subschema = self.__merge_all_of(subschema)
+            subschema = self._merge_all_of(subschema)
             merged.setdefault("properties", {}).update(
                 subschema.get("properties", {})
             )
@@ -261,7 +267,7 @@ class SchemaMerger:
                 merged[k] = v
         return merged
 
-    def __score_candidate(
+    def _score_candidate(
         self,
         message: dict[str, Any],
         candidate: dict[str, Any]
@@ -291,7 +297,7 @@ class SchemaMerger:
         )
         return common_keys + pattern_matches
 
-    def __expand_schema_keywords(
+    def _expand_schema_keywords(
         self,
         obj: dict[str, Any],
         message: dict[str, Any]
@@ -300,7 +306,7 @@ class SchemaMerger:
             best_score = -1
             best_candidate = None
             for candidate in obj["anyOf"]:
-                score = self.__score_candidate(message, candidate)
+                score = self._score_candidate(message, candidate)
                 if score is not None and score > best_score:
                     best_score = score
                     best_candidate = candidate
@@ -312,7 +318,7 @@ class SchemaMerger:
             return {}
         return obj
 
-    def __replace_patterns_with_properties(
+    def _replace_patterns_with_properties(
         self,
         schema: dict[str, Any],
         message: dict[str, Any]
@@ -345,28 +351,28 @@ class SchemaMerger:
 
         return out
 
-    def __enrich_properties(
+    def _enrich_properties(
         self,
         schema: dict[str, Any],
         values: dict[str, Any],
     ) -> dict[str, Any]:
-        schema = self.__expand_schema_keywords(schema, values)
-        schema = self.__replace_patterns_with_properties(schema, values)
+        schema = self._expand_schema_keywords(schema, values)
+        schema = self._replace_patterns_with_properties(schema, values)
         properties = schema.get("properties", {})
         required = set(schema.get("required", []))
         result = {}
         for key, prop_schema in properties.items():
             if key in required or key in values:
                 prop_value = values.get(key, {})
-                prop_schema = self.__expand_schema_keywords(
+                prop_schema = self._expand_schema_keywords(
                     prop_schema,
                     prop_value if isinstance(prop_value, dict) else {}
                 )
-                prop_schema = self.__replace_patterns_with_properties(
+                prop_schema = self._replace_patterns_with_properties(
                     prop_schema,
                     values.get(key, {})
                 )
-                result[key] = self.__enrich_named_property(
+                result[key] = self._enrich_named_property(
                     key, prop_schema, values
                 )
         return result
@@ -394,7 +400,7 @@ class SchemaMerger:
         if obj_value is None and not required:
             return self._meta(obj_schema)
         nested_values = obj_value if isinstance(obj_value, dict) else {}
-        nested = self.__enrich_properties(obj_schema, nested_values)
+        nested = self._enrich_properties(obj_schema, nested_values)
         meta = self._meta(obj_schema)
         if nested:
             meta.update(nested)
@@ -419,7 +425,7 @@ class SchemaMerger:
         out["value"] = out_list
         return out
 
-    def __enrich_named_property(
+    def _enrich_named_property(
         self,
         key: str,
         schema: dict[str, Any],
@@ -444,3 +450,8 @@ class SchemaMerger:
         if SchemaMerger._instance is None:
             SchemaMerger._instance = SchemaMerger(telescope)
         return SchemaMerger._instance
+
+
+def initialize_worker(telescope: str | None = None):
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    SchemaMerger.get_instance(telescope)

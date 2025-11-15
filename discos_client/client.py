@@ -4,11 +4,11 @@ import threading
 import weakref
 from concurrent.futures import ProcessPoolExecutor, Future
 from collections import defaultdict
-from typing import Any, Tuple, Dict
+from typing import Tuple
 import zmq
 from .namespace import DISCOSNamespace
-from .utils import rand_id, initialize_worker
-from .merger import SchemaMerger
+from .utils import rand_id
+from .merger import SchemaMerger, initialize_worker
 
 
 class DISCOSClient:
@@ -77,9 +77,7 @@ class DISCOSClient:
             topics = merger.get_topics()
         self._topics = list(topics)
         for t in self._topics:
-            self.__update_namespace__(t, DISCOSNamespace(
-                **merger.merge_schema(t, {})
-            ))
+            self.__dict__[t] = merger.merge_schema(t)
             self._socket.subscribe(f'{self._client_id}{t}')
         self._recv_thread.start()
 
@@ -142,18 +140,18 @@ class DISCOSClient:
     @staticmethod
     def __merge_task__(
         topic: str,
-        payload: memoryview
-    ) -> Tuple[str, Dict[str, Any]]:
+        payload: bytes
+    ) -> Tuple[str, DISCOSNamespace]:
         """
         Performs the merging between payload and schema. This task can be very
         CPU expensive, therefore it is executed as a separate process.
 
         :param topic: The topic on which the payload was received.
-        :param payload: The memoryview object that points to the ZMQ payload.
+        :param payload: The bytes containing the ZMQ payload.
         """
         return topic, SchemaMerger.get_instance().merge_schema(
             topic,
-            json.loads(payload)
+            payload
         )
 
     @staticmethod
@@ -172,7 +170,6 @@ class DISCOSClient:
             return
         try:
             topic, payload = fut.result()
-            payload = DISCOSNamespace(**payload)
             with self._locks[topic]:
                 self.__update_namespace__(topic, payload)
         finally:
@@ -190,10 +187,7 @@ class DISCOSClient:
         :param payload: The new DISCOSNamespace object, used to update
                         the current one if already present in self.__dict__.
         """
-        if topic in self.__dict__:
-            self.__dict__[topic] <<= payload
-        else:
-            self.__dict__[topic] = payload
+        self.__dict__[topic] <<= payload
 
     def __repr__(self) -> str:
         """

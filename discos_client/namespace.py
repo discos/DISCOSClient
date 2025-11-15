@@ -5,8 +5,7 @@ from copy import deepcopy
 from collections.abc import Iterable
 from typing import Any, Callable, Iterator
 from .utils import delegated_operations, delegated_comparisons
-from .utils import public_dict
-from .merger import META_KEYS
+from .utils import public_dict, META_KEYS
 
 
 __all__ = ["DISCOSNamespace"]
@@ -669,3 +668,16 @@ with optional indentation level <n> (default is 2)
                 attrs.discard("get_value")
             attrs = set(dir(value)).union(attrs)
         return sorted(attrs)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop("_lock", None)
+        state.pop("_observers_lock", None)
+        state.pop("_observers", None)
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        object.__setattr__(self, "_lock", threading.RLock())
+        object.__setattr__(self, "_observers", {})
+        object.__setattr__(self, "_observers_lock", threading.Lock())

@@ -2,17 +2,16 @@ from __future__ import annotations
 import operator
 import secrets
 import string
-import signal
 from typing import Any, Callable
-from .merger import SchemaMerger
 
+
+META_KEYS = ("type", "title", "description", "format", "unit", "enum")
 
 __all__ = [
     "rand_id",
     "delegated_operations",
     "delegated_comparisons",
-    "public_dict",
-    "initialize_worker"
+    "public_dict"
 ]
 
 
@@ -78,21 +77,22 @@ def public_dict(
     get_value_fn: Callable
 ) -> Any:
     d = {}
-    if is_fn(obj):
-        for k, v in vars(obj).items():
-            if k == "_value":
-                d.update(__serialize_value(v, is_fn, get_value_fn))
-            elif not k.startswith("_"):
-                if k == "enum" and is_fn(v):
-                    d[k] = __unwrap_enum(v, is_fn, get_value_fn)
-                else:
-                    d[k] = public_dict(
-                        v,
-                        is_fn,
-                        get_value_fn
-                    ) if is_fn(v) else v
-        return d
-    return obj
+    for k, v in vars(obj).items():
+        if k == "_value":
+            if is_fn(v):
+                d["items"] = __unwrap(v, is_fn, get_value_fn)
+            else:
+                d["value"] = __serialize_value(v, is_fn, get_value_fn)
+        elif not k.startswith("_"):
+            if k == "enum" and is_fn(v):
+                d[k] = __unwrap(v, is_fn, get_value_fn)
+            else:
+                d[k] = public_dict(
+                    v,
+                    is_fn,
+                    get_value_fn
+                ) if is_fn(v) else v
+    return d
 
 
 def __serialize_value(
@@ -100,27 +100,18 @@ def __serialize_value(
     is_fn,
     get_value_fn
 ) -> dict[str, Any]:
-    if isinstance(value, (str, int, float, bool)) or value is None:
-        return {"value": value}
     if isinstance(value, (list, tuple)):
-        return {
-            "items": [
-                public_dict(
-                    v,
-                    is_fn,
-                    get_value_fn
-                ) for v in value
-            ]
-        }
-    return {"value": value}
+        return [
+            public_dict(
+                v,
+                is_fn,
+                get_value_fn
+            ) for v in value
+        ]
+    return value
 
 
-def __unwrap_enum(value: Any, is_fn, get_value_fn) -> Any:
+def __unwrap(value: Any, is_fn, get_value_fn) -> Any:
     while is_fn(value):
         value = get_value_fn(value)
     return list(value) if isinstance(value, (list, tuple)) else value
-
-
-def initialize_worker(telescope: str | None = None):
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
-    SchemaMerger.get_instance(telescope)
