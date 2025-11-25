@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "common/backends.json",
+  "title": "Backends status",
+  "type": "object",
+  "description": "Status of the telescope backends.",
+  "node": "backends",
+  "$defs": {
+    "backend": {
+      "type": "object",
+      "title": "Backend status",
+      "description": "Status of a backend component.",
+      "node": "backends.<backendName>",
+      "properties": {
+        "backendTime": {
+          "type": "object",
+          "title": "Backend time",
+          "description": "Inner time of the backend.",
+          "allOf": [
+            { "$ref": "../definitions/timestamp.json" }
+          ]
+        },
+        "busy": {
+          "type": "boolean",
+          "title": "Busy",
+          "description": "Backend is busy"
+        },
+        "channels": {
+          "type": "array",
+          "title": "Channels",
+          "description": "List of backend's channels.",
+          "items": {
+            "$ref": "#/$defs/channel"
+          }
+        },
+        "commandLineError": {
+          "type": "boolean",
+          "title": "Command line error",
+          "description": "Indicates whether there is an error on the command line socket."
+        },
+        "dataLineError": {
+          "type": "boolean",
+          "title": "Data line error",
+          "description": "Indicates whether there is an error on the data line socket."
+        },
+        "integration": {
+          "type": "number",
+          "title": "Integration",
+          "description": "Integration time.",
+          "unit": "ms"
+        },
+        "sampling": {
+          "type": "boolean",
+          "title": "Sampling",
+          "description": "Indicates whether the backend is currently sampling."
+        },
+        "suspended": {
+          "type": "boolean",
+          "title": "Suspended",
+          "description": "Indicates whether the backend acquisition is suspended."
+        },
+        "timeSync": {
+          "type": "boolean",
+          "title": "Time sync",
+          "description": "Indicates whether the backend time is synchronized."
+        },
+        "timestamp": {
+          "$ref": "../definitions/timestamp.json"
+        }
+      },
+      "required": [
+        "backendTime",
+        "busy",
+        "channels",
+        "commandLineError",
+        "dataLineError",
+        "integration",
+        "sampling",
+        "suspended",
+        "timeSync",
+        "timestamp"
+      ],
+      "additionalProperties": false
+    },
+    "channel": {
+      "type": "object",
+      "title": "Channel",
+      "description": "Single backend channel.",
+      "properties": {
+        "id": {
+          "type": "number",
+          "title": "Channel ID",
+          "description": "Channel ID number."
+        },
+        "attenuation": {
+          "type": "number",
+          "title": "Attenuation",
+          "description": "Channel attenuation.",
+          "unit": "dB"
+        },
+        "bandWidth": {
+          "type": "number",
+          "title": "BandWidth",
+          "description": "Observing bandwidth.",
+          "unit": "MHz"
+        },
+        "bins": {
+          "type": "number",
+          "title": "Bins",
+          "description": "Number of bins used."
+        },
+        "polarization": {
+          "type": "string",
+          "title": "Polarization",
+          "description": "Channel polarization.",
+          "enum": [
+            "LHCP",
+            "RHCP",
+            "FULL STOKES"
+          ]
+        },
+        "sampleRate": {
+          "type": "number",
+          "title": "Sample rate",
+          "description": "Sample rate of the section.",
+          "unit": "MHz"
+        },
+        "startFrequency": {
+          "type": "number",
+          "title": "Starting frequency",
+          "description": "Starting observing frequency.",
+          "unit": "MHz"
+        },
+        "systemTemperature": {
+          "type": "number",
+          "title": "System temperature",
+          "description": "Last read value of the system temperature.",
+          "unit": "K"
+        }
+      },
+      "required": [
+        "id",
+        "attenuation",
+        "bandWidth",
+        "bins",
+        "polarization",
+        "sampleRate",
+        "startFrequency",
+        "systemTemperature"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "anyOf": [
+    {
+      "type": "object",
+      "patternProperties": {
+        "^[A-Za-z0-9_]+$": { "$ref": "#/$defs/backend" }
+      },
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false
+    }
+  ]
+}
