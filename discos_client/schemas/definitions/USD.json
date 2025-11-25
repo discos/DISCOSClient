@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "definitions/USD.json",
+  "type": "object",
+  "title": "USD",
+  "description": "USD component.",
+  "properties": {
+    "accelerationFactor": {
+      "type": "number",
+      "title": "Acceleration Factor",
+      "description": "USD acceleration factor."
+    },
+    "available": {
+      "type": "boolean",
+      "title": "Available",
+      "description": "Indicates whether the USD is available or not."
+    },
+    "calibrated": {
+      "type": "boolean",
+      "title": "Calibrated",
+      "description": "Indicates whether the USD is calibrated or not."
+    },
+    "commandedPosition": {
+      "type": "number",
+      "title": "Commanded Position",
+      "description": "USD commanded position.",
+      "unit": "μstep"
+    },
+    "currentPosition": {
+      "type": "number",
+      "title": "Current Position",
+      "description": "USD current position.",
+      "unit": "μstep"
+    },
+    "delay": {
+      "type": "number",
+      "title": "Delay",
+      "description": "USD delay on response. A value equal to -1 means no response is expected to be received.",
+      "unit": "μs"
+    },
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Indicates whether the USD is enabled or not."
+    },
+    "maximumFrequency": {
+      "type": "number",
+      "title": "Maximum Frequency",
+      "description": "USD maximum frequency.",
+      "unit": "Hz"
+    },
+    "minimumFrequency": {
+      "type": "number",
+      "title": "Minimum Frequency",
+      "description": "USD minimum frequency.",
+      "unit": "Hz"
+    },
+    "running": {
+      "type": "boolean",
+      "title": "Running",
+      "description": "Indicates whether the USD is moving or not."
+    },
+    "softwareVersion": {
+      "type": "string",
+      "title": "Software Version",
+      "description": "USD software version."
+    },
+    "USDType": {
+      "type": "string",
+      "title": "USD Type",
+      "description": "USD type.",
+      "enum": [
+        "USD50xxx",
+        "USD60xxx"
+      ]
+    }
+  },
+  "initialize": [
+    "accelerationFactor",
+    "available",
+    "calibrated",
+    "commandedPosition",
+    "currentPosition",
+    "delay",
+    "enabled",
+    "maximumFrequency",
+    "minimumFrequency",
+    "running",
+    "softwareVersion",
+    "USDType"
+  ],
+  "additionalProperties": false
+}

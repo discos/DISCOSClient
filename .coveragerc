@@ -1,5 +1,5 @@
 [run]
-concurrency = thread, multiprocessing
+concurrency = thread
 source = discos_client
 
 [paths]

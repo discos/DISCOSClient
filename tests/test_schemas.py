@@ -49,11 +49,13 @@ class TestSchemas(unittest.TestCase):
         messages_dir = Path(__file__).parent / "messages"
 
         for message_file in messages_dir.rglob("*.json"):
-            base, sep, obj_name = message_file.stem.partition(".")
+            rel_path = message_file.relative_to(messages_dir)
+            base, sep, obj_name = rel_path.stem.partition(".")
+            parent = rel_path.parent.stem
 
-            schema_name = f"{base}.json"
+            schema_name = f"{parent}/{base}.json"
             matching_schema = next(
-                s for s in self.schemas if s.name == schema_name
+                s for s in self.schemas if s.as_posix() == schema_name
             )
 
             schema = self.resources[matching_schema.as_posix()].contents

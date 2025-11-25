@@ -269,16 +269,26 @@ class TestDISCOSNamespace(unittest.TestCase):
         self.assertEqual(ns.a, "b")
         self.assertEqual(ns._a, "a")  # noqa
         self.assertFalse(ns is ns2)
+        ns3 = ns.copy()
         ns <<= ns  # Should return immediately and do nothing
+        ns <<= ns3
+        with self.assertRaises(TypeError) as ex:
+            ns <<= b"a"
+        self.assertEqual(
+            str(ex.exception),
+            "Unsupported operand type for <<=: 'DISCOSNamespace' and 'bytes'"
+        )
 
     def test_comparison(self):
         a = 2
         ns = DISCOSNamespace(value=a)
         ns2 = DISCOSNamespace(value=a)
+        ns3 = DISCOSNamespace(a=a)
         self.assertEqual(ns, a)
         self.assertNotEqual(ns, a + 1)
         self.assertFalse(ns < ns2)
         self.assertFalse(ns > ns2)
+        self.assertNotEqual(ns3, a)
 
     def test_dir(self):
         ns = DISCOSNamespace(value="foo", title="title")

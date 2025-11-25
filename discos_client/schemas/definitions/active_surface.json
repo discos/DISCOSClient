@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "definitions/active_surface.json",
+  "title": "Active Surface Boss",
+  "type": "object",
+  "description": "This schema is sent by the DISCOS Active Surface component.",
+  "properties": {
+    "LUTFilename": {
+      "type": "string",
+      "title": "LookUp Table file name",
+      "description": "Name of the lookup table file being used."
+    },
+    "profile": {
+      "type": "string",
+      "title": "Profile",
+      "description": "Current active surface pointing profile.",
+      "enum": [
+        "PARK",
+        "SHAPED",
+        "SHAPED FIXED",
+        "PARABOLIC",
+        "PARABOLIC FIXED"
+      ]
+    },
+    "status": {
+      "$ref": "../definitions/status.json"
+    },
+    "timestamp": {
+      "$ref": "../definitions/timestamp.json"
+    },
+    "tracking": {
+      "type": "boolean",
+      "title": "Tracking",
+      "description": "Indicates whether the Active Surface is tracking, i.e., if the primary mirror is refreshed when the elevation changes."
+    }
+  },
+  "required": [
+    "LUTFilename",
+    "profile",
+    "status",
+    "timestamp",
+    "tracking"
+  ]
+}

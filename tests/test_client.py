@@ -12,7 +12,7 @@ class TestPublisher:
 
     PORT = 16000
 
-    def __init__(self):
+    def __init__(self, telescope=None):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.XPUB)
         self.socket.setsockopt(zmq.LINGER, 0)
@@ -24,8 +24,12 @@ class TestPublisher:
                 break
             except zmq.ZMQError:
                 pass
-        messages_dir = Path(__file__).resolve().parent
-        message_files = messages_dir.glob("messages/*.json")
+        messages_dir = Path(__file__).resolve().parent / "messages"
+        message_files = list(messages_dir.glob("common/*.json"))
+        if telescope:
+            message_files += list(
+                messages_dir.glob(f"{telescope.lower()}/*.json")
+            )
         self.messages = {}
         for message in message_files:
             with open(message, "r", encoding="utf-8") as f:
@@ -199,9 +203,8 @@ class TestDISCOSClient(unittest.TestCase):
         self.assertNotIn("\": ", f"{client:c}")
 
     def test_bind(self):
-        with TestPublisher():
+        with TestPublisher("SRT"):
             client = DISCOSClient(address="127.0.0.1", port=16000)
-            time.sleep(1)
             s = set()
             called = set()
             s.add(id(client.antenna.timestamp.unix_time))
@@ -226,7 +229,6 @@ class TestDISCOSClient(unittest.TestCase):
     def test_wait(self):
         with TestPublisher():
             client = DISCOSClient(address="127.0.0.1", port=16000)
-            time.sleep(1)
             unix_time = client.antenna.timestamp.unix_time.copy()
             antenna = client.antenna.copy()
             self.assertNotEqual(

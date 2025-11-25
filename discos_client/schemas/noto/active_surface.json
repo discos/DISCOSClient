@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "noto/active_surface.json",
+  "title": "Noto Active Surface Boss",
+  "type": "object",
+  "description": "This schema is sent by the Noto DISCOS Active Surface component.",
+  "node": "active_surface",
+  "$defs": {
+    "LAN_2_6": {
+      "allOf": [
+        { "$ref": "../definitions/LAN.json" },
+        {
+          "type": "object",
+          "properties": {
+            "USD02": { "$ref": "../definitions/USD.json" },
+            "USD03": { "$ref": "../definitions/USD.json" },
+            "USD04": { "$ref": "../definitions/USD.json" },
+            "USD05": { "$ref": "../definitions/USD.json" },
+            "USD06": { "$ref": "../definitions/USD.json" }
+          },
+          "initialize": [
+            "USD02",
+            "USD03",
+            "USD04",
+            "USD05",
+            "USD06"
+          ]
+        }
+      ]
+    },
+    "SECTOR": {
+      "type": "object",
+      "title": "Active surface sector",
+      "description": "Sector of the primary mirror.",
+      "properties": {
+        "LAN01": { "$ref": "#/$defs/LAN_2_6" },
+        "LAN02": { "$ref": "#/$defs/LAN_2_6" },
+        "LAN03": { "$ref": "#/$defs/LAN_2_6" },
+        "LAN04": { "$ref": "#/$defs/LAN_2_6" },
+        "LAN05": { "$ref": "#/$defs/LAN_2_6" },
+        "LAN06": { "$ref": "#/$defs/LAN_2_6" },
+        "LAN07": { "$ref": "#/$defs/LAN_2_6" },
+        "LAN08": { "$ref": "#/$defs/LAN_2_6" },
+        "LAN09": { "$ref": "#/$defs/LAN_2_6" },
+        "LAN10": { "$ref": "#/$defs/LAN_2_6" },
+        "LAN11": { "$ref": "#/$defs/LAN_2_6" },
+        "LAN12": { "$ref": "#/$defs/LAN_2_6" }
+      },
+      "required": [
+        "LAN01",
+        "LAN02",
+        "LAN03",
+        "LAN04",
+        "LAN05",
+        "LAN06",
+        "LAN07",
+        "LAN08",
+        "LAN09",
+        "LAN10",
+        "LAN11",
+        "LAN12"
+      ]
+    }
+  },
+  "allOf": [
+    { "$ref": "../definitions/active_surface.json" },
+    {
+      "type": "object",
+      "properties": {
+        "SECTOR01": {
+          "$ref": "#/$defs/SECTOR"
+        },
+        "SECTOR02": {
+          "$ref": "#/$defs/SECTOR"
+        },
+        "SECTOR03": {
+          "$ref": "#/$defs/SECTOR"
+        },
+        "SECTOR04": {
+          "$ref": "#/$defs/SECTOR"
+        }
+      },
+      "required": [
+        "SECTOR01",
+        "SECTOR02",
+        "SECTOR03",
+        "SECTOR04"
+      ]
+    }
+  ]
+}

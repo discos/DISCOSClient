@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 import json
 import threading
 from copy import deepcopy
@@ -15,7 +16,7 @@ __all__ = ["DISCOSNamespace"]
 @delegated_comparisons('__value_comparison__')
 class DISCOSNamespace:
     """
-    Immutable recursive container for structured data.
+    Read-only recursive container for structured data.
 
     This class wraps nested dictionaries and lists into nested
     DISCOSNamespace instances and allows limited operations on
@@ -27,48 +28,120 @@ class DISCOSNamespace:
         "_lock",
         "_observers",
         "_observers_lock",
+        "_schema",
         "bind",
         "unbind",
         "wait",
         "copy"
     )
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(
+        self, schema: dict[str, Any] | None = None,
+        **kwargs: Any
+    ) -> None:
         """
         Construct a DISCOSNamespace object, recursively wrapping
         dictionaries and lists as DISCOSNamespace instances.
 
         Special keys "items" and "value" are stored as internal
         value containers.
+        Key "schema" represent the schema of the object tree, holding metadata.
 
+        :param schema: The schema of the object tree.
         :param kwargs: Arbitrary keyword arguments to initialize attributes.
         """
         object.__setattr__(self, "_lock", threading.RLock())
         object.__setattr__(self, "_observers", {})
         object.__setattr__(self, "_observers_lock", threading.Lock())
+        object.__setattr__(self, "_schema", schema)
 
-        def transform(value: Any) -> Any:
-            if isinstance(value, dict):
-                return DISCOSNamespace(**value)
-            if isinstance(value, list):
-                value = DISCOSNamespace(
-                    value=tuple(transform(v) for v in value)
-                )
-                return value
-            return value
+        meta: dict[str, Any] = {}
+        if schema is not None:
+            for mk in META_KEYS:
+                if mk in schema:
+                    meta[mk] = schema[mk]
+        self.__dict__.update(meta)
 
+        clean_kwargs: dict[str, Any] = {}
         for k, v in list(kwargs.items()):
             if k in ["items", "value"]:
-                del kwargs[k]
-                k = "_value"
-            kwargs[k] = transform(v)
-        self.__dict__.update(kwargs)
+                clean_kwargs["_value"] = self._wrap_value(v, schema)
+            else:
+                subschema = None
+                if not k.startswith("_"):
+                    subschema = self._find_subschema(schema, k)
+                clean_kwargs[k] = self._wrap_value(v, subschema)
+        self.__dict__.update(clean_kwargs)
+
+    @staticmethod
+    def _find_subschema(
+        schema: dict[str, Any] | None,
+        key: str
+    ) -> dict[str, Any] | None:
+        """
+        Search and finds the subschema for a given key, used when creating a
+        subnode.
+
+        :param schema: The object schema.
+        :param key: The key used to search for a subschema.
+        :return: The schema for the given key, or None if not found.
+        """
+        if schema is None:
+            return None
+
+        props = schema.get("properties", {})
+        if key in props:
+            return props[key]
+
+        pprops = schema.get("patternProperties", {})
+        for pat, pschema in pprops.items():
+            try:
+                if re.fullmatch(pat, key):
+                    return pschema
+            except re.error:  # pragma: no cover
+                continue
+
+        any_of = schema.get("anyOf")
+        if isinstance(any_of, list):
+            for branch in any_of:
+                found = DISCOSNamespace._find_subschema(branch, key)
+                if found is not None:
+                    return found
+
+        return None
+
+    @staticmethod
+    def _wrap_value(value: Any, schema: dict[str, Any] | None) -> Any:
+        """
+        Transform dictionaries and lists to DISCOSNamespace objects.
+
+        :param value: The value to be transformed to DISCOSNamespace if dict or
+                      list.
+        :param schema: The schema representing the object.
+        :return: The wrapped value if dict or list, value otherwise.
+        """
+        if isinstance(value, dict):
+            return DISCOSNamespace(schema=schema, **value)
+        if isinstance(value, list):
+            item_schema = None
+            if schema is not None and schema.get("type") == "array":
+                item_schema = schema.get("items")
+            return DISCOSNamespace(
+                schema=schema,
+                value=tuple(
+                    DISCOSNamespace(schema=item_schema, **v)
+                    if isinstance(v, dict) else v
+                    for v in value
+                )
+            )
+        return value
 
     def get_value(self) -> Any:
         """
         Return the internal primitive value.
 
         :return: The internal value of the instance.
+        :raises AttributeError: If the object does not hold a primitive value.
         """
         def raise_error():
             raise AttributeError(
@@ -135,9 +208,9 @@ class DISCOSNamespace:
         """
         Block until the DISCOSNamespace triggers a change notification.
 
-        :param predicate: Optional predicate that the value must satisfy
+        :param predicate: Optional predicate that the value must satisfy.
         :param timeout: Optional timeout in seconds.
-        :return: The updated object, or None if the timeout occurred.
+        :return: The updated object, or the same object if timeout has expired.
         """
         event = threading.Event()
 
@@ -182,14 +255,17 @@ class DISCOSNamespace:
         self,
         op: Callable[[Any, Any], bool],
         other: Any
-    ) -> bool:
+    ) -> bool | type(NotImplemented):
         """
         Apply a comparison to the internal value if it is primitive,
         or to the inner __dict__ if both operands are DISCOSNamespace
 
         :param op: The comparison function to apply on the instance.
         :param other: The second operand for the comparison.
-        :return: True if the comparison matches, False otherwise.
+        :return:
+            - True if the comparison matches, False otherwise.
+            - NotImplemented if the comparison is not supported for the given
+              operands
         """
         if DISCOSNamespace.__is__(other):
             try:
@@ -209,8 +285,7 @@ class DISCOSNamespace:
                 return False
         if DISCOSNamespace.__has_value__(self):
             return op(self._value, other)
-
-        return False
+        return NotImplemented
 
     def __repr__(self) -> str:
         """
@@ -368,7 +443,7 @@ class DISCOSNamespace:
 
         :param name: The new instance attribute name.
         :param value: The new instance attribute value.
-        :raise TypeError: When an assignment on the instance is attempted.
+        :raises TypeError: When an assignment on the instance is attempted.
         """
         raise TypeError(
             f"{self.__typename__} is read-only and "
@@ -379,39 +454,135 @@ class DISCOSNamespace:
         """
         Prevent attribute deletion.
 
-        :raise TypeError: When a `del` is called on an instance attribute.
+        :raises TypeError: When a `del` is called on an instance attribute.
         """
         raise TypeError(
             f"{self.__typename__} is read-only and "
             "does not allow attribute deletion"
         )
 
-    def __ilshift__(self, other: DISCOSNamespace) -> DISCOSNamespace:
+    def __ilshift__(self, other: Any) -> DISCOSNamespace:
         """
-        In-place merge of another DISCOSNamespace.
+        In-place update of the object with another DISCOSNamespace,
+        dict, list or value.
 
-        :param other: Another DISCOSNamespace or compatible object.
-        :return: Self after the merge.
+        :param other: Another DISCOSNamespace, dict, list or other object type.
+        :return: This object after the merge.
+        :raises TypeError: When `other` argument type is not supported for
+                          merging.
         """
         if self is other:
             return self
 
+        notify = False
+
+        if DISCOSNamespace.__is__(other):
+            notify = self._ilshift_namespace(other)
+        elif isinstance(other, dict):
+            notify = self._ilshift_dict(other)
+        elif isinstance(other, list):
+            notify = self._ilshift_list(other)
+        elif isinstance(other, (bool, int, float, str)):
+            notify = self._ilshift_value(other)
+        else:
+            raise TypeError(
+                f"Unsupported operand type for <<=: '{type(self).__name__}' "
+                f"and '{type(other).__name__}'"
+            )
+
+        if notify:
+            self.__notify__()
+        return self
+
+    def _ilshift_namespace(self, other: DISCOSNamespace) -> bool:
+        """
+        Updates the object with another DISCOSNamespace object.
+
+        :param other: Another DISCOSNamespace object whose values will
+                      overwrite the self ones.
+        :return: A boolean indicating whether self should notify the waiters
+                 or execute the bound callbacks.
+        """
+        notify = False
         for k, ov in vars(other).items():
             if k.startswith("_") and k != "_value":
                 continue
-
             sv = self.__dict__.get(k, None)
-
             if DISCOSNamespace.__is__(sv) and DISCOSNamespace.__is__(ov):
                 sv <<= ov
+                notify = True
             else:
                 if ov == sv:
                     continue
                 with self._lock:
                     object.__setattr__(self, k, ov)
+                    notify = True
+        return notify
 
-        self.__notify__()
-        return self
+    def _ilshift_dict(self, other: dict) -> bool:
+        """
+        Updates the object with a dict object.
+
+        :param other: A dict object whose values will overwrite the self ones.
+        :return: A boolean indicating whether self should notify the waiters
+                 or execute the bound callbacks.
+        """
+        notify = False
+        for k, v in other.items():
+            node = self.__dict__.get(k)
+            if node is None:
+                schema = DISCOSNamespace._find_subschema(self._schema, k)
+                node = DISCOSNamespace(schema=schema)
+                self.__dict__[k] = node
+                notify = True
+            if DISCOSNamespace.__is__(node):
+                node <<= v
+                notify = True
+        return notify
+
+    def _ilshift_list(self, other: list) -> bool:
+        """
+        Updates the object with a list object.
+
+        :param other: A list object whose values will overwrite the self ones.
+        :return: A boolean indicating whether self should notify the waiters
+                 or execute the bound callbacks.
+        """
+        notify = False
+        sv = self.__dict__.get("_value", ())
+        if not isinstance(sv, tuple) or len(sv) != len(other):
+            schema = self.__dict__.get("_schema")
+            if schema:
+                schema = schema.get("items", None)
+            value = []
+            for item in other:
+                d = DISCOSNamespace(schema=schema)
+                d <<= item
+                value.append(d)
+            self.__dict__["_value"] = sv = tuple(value)
+            notify = True
+        for s, o in zip(sv, other):
+            if DISCOSNamespace.__is__(s):
+                s <<= o
+                notify = True
+        return notify
+
+    def _ilshift_value(self, other: bool | int | float | str) -> bool:
+        """
+        Updates the object with another leaf object.
+
+        :param other: An object of bool, int, float, str type which will
+                      overwrite the inner self value.
+        :return: A boolean indicating whether self should notify the waiters
+                 or execute the bound callbacks.
+        """
+        sdict = self.__dict__
+        sv = sdict.get("_value")
+        if sv == other:
+            return False
+        with self._lock:
+            sdict["_value"] = other
+        return True
 
     def __format__(self, spec: str) -> str:
         """
@@ -425,7 +596,8 @@ with optional indentation level <n> (default is 2)
             | 'f' - full representation with metadata
             | 'm' - metadata only representation
 
-        :return: A JSON formatted string.
+        :return: A JSON formatted string for non-leaf nodes. If self is a leaf
+                 node, it delegates to `format(self._value, spec)`.
         :raise ValueError: If the format specifier is unknown or malformed.
         """
         if self.__has_value__(self):
@@ -619,11 +791,15 @@ with optional indentation level <n> (default is 2)
         """
         Execute the bound callbacks, if are present
         """
+        with self._observers_lock:
+            if not self._observers:
+                return
+            observers = list(self._observers.items())
+
         with self._lock:
-            with self._observers_lock:
-                for cb, predicates in list(self._observers.items()):
-                    if any(predicate(self) for predicate in predicates):
-                        cb(self)
+            for cb, predicates in observers:
+                if any(predicate(self) for predicate in predicates):
+                    cb(self)
 
     def __getattr__(self, name: str):
         """
@@ -648,7 +824,7 @@ with optional indentation level <n> (default is 2)
                 f"'{self.__typename__}' object has no attribute '{name}'"
             )
 
-    def __dir__(self) -> None:
+    def __dir__(self) -> list[str]:
         """
         Extend the list of available attributes with those of the internal
         value.
@@ -668,16 +844,3 @@ with optional indentation level <n> (default is 2)
                 attrs.discard("get_value")
             attrs = set(dir(value)).union(attrs)
         return sorted(attrs)
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        state.pop("_lock", None)
-        state.pop("_observers_lock", None)
-        state.pop("_observers", None)
-        return state
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        object.__setattr__(self, "_lock", threading.RLock())
-        object.__setattr__(self, "_observers", {})
-        object.__setattr__(self, "_observers_lock", threading.Lock())

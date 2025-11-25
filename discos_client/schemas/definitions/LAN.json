@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "definitions/LAN.json",
+  "title": "Sector LAN",
+  "type": "object",
+  "description": "Ethernet to serial converter.",
+  "properties": {
+    "connected": {
+      "type": "boolean",
+      "title": "Connected",
+      "description": "Component is connected to the ethernet to serial converter."
+    }
+  },
+  "required": [
+    "connected"
+  ]
+}

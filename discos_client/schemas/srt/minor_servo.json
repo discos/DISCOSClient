@@ -210,19 +210,6 @@
       "description": "Status of a minor servo component.",
       "node": "minor_servo.<minorServoName>",
       "properties": {
-        "axes": {
-          "type": "object",
-          "title": "Axes",
-          "description": "Minor servo axes information.",
-          "patternProperties": {
-            "^T[XYZ]$": {
-              "$ref": "#/$defs/translation_axis_info"
-            },
-            "^R(?:[XYZ]|THETA)$": {
-              "$ref": "#/$defs/rotation_axis_info"
-            }
-          }
-        },
         "blocked": {
           "type": "boolean",
           "title": "Blocked",
@@ -274,7 +261,6 @@
         }
       },
       "required": [
-        "axes",
         "blocked",
         "currentSetup",
         "driveCabinetStatus",
@@ -323,6 +309,11 @@
           ]
         }
       ]
+    },
+    "axes": {
+      "type": "object",
+      "title": "Axes",
+      "description": "Minor servo axes information."
     }
   },
   "anyOf": [
@@ -337,7 +328,32 @@
     {
       "type": "object",
       "properties": {
-        "GFR": { "$ref": "#/$defs/minor_servo" }
+        "GFR": {
+          "allOf": [
+            { "$ref": "#/$defs/minor_servo" },
+            {
+              "type": "object",
+              "properties": {
+                "axes": {
+                  "allOf": [
+                    { "$ref": "#/$defs/axes" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "RZ": { "$ref": "#/$defs/rotation_axis_info" }
+                      },
+                      "required": ["RZ"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "axes"
+              ]
+            }
+          ]
+        }
       },
       "required": ["GFR"],
       "additionalProperties": false
@@ -345,7 +361,32 @@
     {
       "type": "object",
       "properties": {
-        "M3R": { "$ref": "#/$defs/minor_servo" }
+        "M3R": {
+          "allOf": [
+            { "$ref": "#/$defs/minor_servo" },
+            {
+              "type": "object",
+              "properties": {
+                "axes": {
+                  "allOf": [
+                    { "$ref": "#/$defs/axes" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "RZ": { "$ref": "#/$defs/rotation_axis_info" }
+                      },
+                      "required": ["RZ"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "axes"
+              ]
+            }
+          ]
+        }
       },
       "required": ["M3R"],
       "additionalProperties": false
@@ -353,7 +394,44 @@
     {
       "type": "object",
       "properties": {
-        "SRP": { "$ref": "#/$defs/tracking_minor_servo" }
+        "SRP": {
+          "allOf": [
+            { "$ref": "#/$defs/tracking_minor_servo" },
+            {
+              "type": "object",
+              "properties": {
+                "axes": {
+                  "allOf": [
+                    { "$ref": "#/$defs/axes" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "TX": { "$ref": "#/$defs/translation_axis_info" },
+                        "TY": { "$ref": "#/$defs/translation_axis_info" },
+                        "TZ": { "$ref": "#/$defs/translation_axis_info" },
+                        "RX": { "$ref": "#/$defs/rotation_axis_info" },
+                        "RY": { "$ref": "#/$defs/rotation_axis_info" },
+                        "RZ": { "$ref": "#/$defs/rotation_axis_info" }
+                      },
+                      "required": [
+                        "TX",
+                        "TY",
+                        "TZ",
+                        "RX",
+                        "RY",
+                        "RZ"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "axes"
+              ]
+            }
+          ]
+        }
       },
       "required": ["SRP"],
       "additionalProperties": false
@@ -361,10 +439,47 @@
     {
       "type": "object",
       "properties": {
-        "PFP": { "$ref": "#/$defs/tracking_minor_servo" }
+        "PFP": {
+          "allOf": [
+            { "$ref": "#/$defs/tracking_minor_servo" },
+            {
+              "type": "object",
+              "properties": {
+                "axes": {
+                  "allOf": [
+                    { "$ref": "#/$defs/axes" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "TX": { "$ref": "#/$defs/translation_axis_info" },
+                        "TZ": { "$ref": "#/$defs/translation_axis_info" },
+                        "RTHETA": { "$ref": "#/$defs/rotation_axis_info" }
+                      },
+                      "required": [
+                        "TX",
+                        "TZ",
+                        "RTHETA"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "axes"
+              ]
+            }
+          ]
+        }
       },
       "required": ["PFP"],
       "additionalProperties": false
     }
+  ],
+  "initialize": [
+    "boss",
+    "GFR",
+    "M3R",
+    "SRP"
   ]
 }

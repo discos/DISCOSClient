@@ -1,0 +1,209 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "srt/active_surface.json",
+  "title": "SRT Active Surface Boss",
+  "type": "object",
+  "description": "This schema is sent by the SRT DISCOS Active Surface component.",
+  "node": "active_surface",
+  "$defs": {
+    "LAN_7_15": {
+      "allOf": [
+        { "$ref": "../definitions/LAN.json" },
+        {
+          "type": "object",
+          "properties": {
+            "USD07": { "$ref": "../definitions/USD.json" },
+            "USD08": { "$ref": "../definitions/USD.json" },
+            "USD09": { "$ref": "../definitions/USD.json" },
+            "USD10": { "$ref": "../definitions/USD.json" },
+            "USD11": { "$ref": "../definitions/USD.json" },
+            "USD12": { "$ref": "../definitions/USD.json" },
+            "USD13": { "$ref": "../definitions/USD.json" },
+            "USD14": { "$ref": "../definitions/USD.json" },
+            "USD15": { "$ref": "../definitions/USD.json" }
+          },
+          "initialize": [
+            "USD07",
+            "USD08",
+            "USD09",
+            "USD10",
+            "USD11",
+            "USD12",
+            "USD13",
+            "USD14",
+            "USD15"
+          ]
+        }
+      ]
+    },
+    "LAN_3_15": {
+      "allOf": [
+        { "$ref": "#/$defs/LAN_7_15" },
+        {
+          "type": "object",
+          "properties": {
+            "USD03": { "$ref": "../definitions/USD.json" },
+            "USD04": { "$ref": "../definitions/USD.json" },
+            "USD05": { "$ref": "../definitions/USD.json" },
+            "USD06": { "$ref": "../definitions/USD.json" }
+          },
+          "initialize": [
+            "USD03",
+            "USD04",
+            "USD05",
+            "USD06"
+          ]
+        }
+      ]
+    },
+    "LAN_1_15": {
+      "allOf": [
+        { "$ref": "#/$defs/LAN_3_15" },
+        {
+          "type": "object",
+          "properties": {
+            "USD01": { "$ref": "../definitions/USD.json" },
+            "USD02": { "$ref": "../definitions/USD.json" }
+          },
+          "initialize": [
+            "USD01",
+            "USD02"
+          ]
+        }
+      ]
+    },
+    "LAN_1_16": {
+      "allOf": [
+        { "$ref": "#/$defs/LAN_1_15" },
+        {
+          "type": "object",
+          "properties": {
+            "USD16": { "$ref": "../definitions/USD.json" }
+          },
+          "initialize": [
+            "USD16"
+          ]
+        }
+      ]
+    },
+    "LAN_3_17": {
+      "allOf": [
+        { "$ref": "#/$defs/LAN_3_15" },
+        {
+          "type": "object",
+          "properties": {
+            "USD17": { "$ref": "../definitions/USD.json" }
+          },
+          "initialize": [
+            "USD17"
+          ]
+        }
+      ]
+    },
+    "SECTOR": {
+      "type": "object",
+      "title": "Active surface sector",
+      "description": "Sector of the primary mirror.",
+      "properties": {
+        "LAN02": { "$ref": "#/$defs/LAN_7_15" },
+        "LAN04": { "$ref": "#/$defs/LAN_7_15" },
+        "LAN05": { "$ref": "#/$defs/LAN_3_15" },
+        "LAN06": { "$ref": "#/$defs/LAN_7_15" },
+        "LAN07": { "$ref": "#/$defs/LAN_1_15" },
+        "LAN08": { "$ref": "#/$defs/LAN_7_15" },
+        "LAN09": { "$ref": "#/$defs/LAN_3_15" },
+        "LAN10": { "$ref": "#/$defs/LAN_7_15" },
+        "LAN12": { "$ref": "#/$defs/LAN_7_15" }
+      },
+      "required": [
+        "LAN02",
+        "LAN04",
+        "LAN05",
+        "LAN06",
+        "LAN07",
+        "LAN08",
+        "LAN09",
+        "LAN10",
+        "LAN12"
+      ]
+    },
+    "SECTOR_ODD": {
+      "allOf": [
+        { "$ref": "#/$defs/SECTOR" },
+        {
+          "type": "object",
+          "properties": {
+            "LAN01": { "$ref": "#/$defs/LAN_3_15" },
+            "LAN03": { "$ref": "#/$defs/LAN_1_15" },
+            "LAN11": { "$ref": "#/$defs/LAN_1_16" }
+          },
+          "required": [
+            "LAN01",
+            "LAN03",
+            "LAN11"
+          ]
+        }
+      ]
+    },
+    "SECTOR_EVEN": {
+      "allOf": [
+        { "$ref": "#/$defs/SECTOR" },
+        {
+          "type": "object",
+          "properties": {
+            "LAN01": { "$ref": "#/$defs/LAN_3_17" },
+            "LAN03": { "$ref": "#/$defs/LAN_1_16" },
+            "LAN11": { "$ref": "#/$defs/LAN_1_15" }
+          },
+          "required": [
+            "LAN01",
+            "LAN03",
+            "LAN11"
+          ]
+        }
+      ]
+    }
+  },
+  "allOf": [
+    { "$ref": "../definitions/active_surface.json" },
+    {
+      "type": "object",
+      "properties": {
+        "SECTOR01": {
+          "$ref": "#/$defs/SECTOR_ODD"
+        },
+        "SECTOR02": {
+          "$ref": "#/$defs/SECTOR_EVEN"
+        },
+        "SECTOR03": {
+          "$ref": "#/$defs/SECTOR_ODD"
+        },
+        "SECTOR04": {
+          "$ref": "#/$defs/SECTOR_EVEN"
+        },
+        "SECTOR05": {
+          "$ref": "#/$defs/SECTOR_ODD"
+        },
+        "SECTOR06": {
+          "$ref": "#/$defs/SECTOR_EVEN"
+        },
+        "SECTOR07": {
+          "$ref": "#/$defs/SECTOR_ODD"
+        },
+        "SECTOR08": {
+          "$ref": "#/$defs/SECTOR_EVEN"
+        }
+      },
+      "required": [
+        "SECTOR01",
+        "SECTOR02",
+        "SECTOR03",
+        "SECTOR04",
+        "SECTOR05",
+        "SECTOR06",
+        "SECTOR07",
+        "SECTOR08"
+      ]
+    }
+  ]
+}

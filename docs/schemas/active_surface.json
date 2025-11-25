@@ -11,8 +11,9 @@
       "title": "Active surface sector",
       "description": "Sector of the primary mirror.",
       "patternProperties": {
-        "^LAN(?:0[1-9]|1[0-2])$": { "$ref": "#/$defs/LAN" }
-      }
+        "^LAN(0[1-9]|1[0-2])$": { "$ref": "#/$defs/LAN" }
+      },
+      "additionalProperties": false
     },
     "LAN": {
       "type": "object",
@@ -29,8 +30,9 @@
         "connected"
       ],
       "patternProperties": {
-        "^USD(?:0[1-9]|1[0-7])$": { "$ref": "#/$defs/USD" }
-      }
+        "^USD(0[1-9]|1[0-7])$": { "$ref": "#/$defs/USD" }
+      },
+      "additionalProperties": false
     },
     "USD": {
       "type": "object",

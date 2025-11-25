@@ -1,14 +1,12 @@
 from __future__ import annotations
 import json
-import threading
 import weakref
-from concurrent.futures import ProcessPoolExecutor, Future
+from threading import Thread, Lock
 from collections import defaultdict
-from typing import Tuple
 import zmq
 from .namespace import DISCOSNamespace
 from .utils import rand_id
-from .merger import SchemaMerger, initialize_worker
+from .initializer import NSInitializer
 
 
 class DISCOSClient:
@@ -31,35 +29,10 @@ class DISCOSClient:
         :param address: IP address to subscribe to.
         :param port: TCP port to subscribe to.
         :param telescope: name of the telescope the client is connecting to.
+        :raises ValueError: If one or more given topics are not known.
         """
-        self_ref = weakref.ref(self)
-        self._client_id = rand_id()
-        merger = SchemaMerger(telescope)
-        self._waiting = defaultdict(list)
-        self._waiting_lock = threading.Lock()
-        self._locks = defaultdict(threading.Lock)
-        self._pool = ProcessPoolExecutor(
-            initializer=initialize_worker,
-            initargs=(telescope,)
-        )
-        self._context = zmq.Context()
-        self._socket = self._context.socket(zmq.SUB)
-        self._socket.setsockopt(zmq.LINGER, 0)
-        self._socket.setsockopt(zmq.RCVTIMEO, 10)
-        self._socket.connect(f'tcp://{address}:{port}')
-        self._recv_thread = threading.Thread(
-            target=self.__recv__,
-            args=(self_ref,),
-            daemon=True
-        )
-        self._finalizer = weakref.finalize(
-            self,
-            self.__cleanup__,
-            self._pool,
-            self._socket,
-            self._context,
-        )
-        valid_topics = merger.get_topics()
+        initializer = NSInitializer(telescope)
+        valid_topics = initializer.get_topics()
         invalid = [t for t in topics if t not in valid_topics]
         if invalid:
             if len(invalid) > 1:
@@ -74,120 +47,85 @@ class DISCOSClient:
                 f"'{valid_topics[-1]}'"
             )
         if not topics:
-            topics = merger.get_topics()
-        self._topics = list(topics)
-        for t in self._topics:
-            self.__dict__[t] = merger.merge_schema(t)
-            self._socket.subscribe(f'{self._client_id}{t}')
-        self._recv_thread.start()
+            topics = initializer.get_topics()
+        self._topics = topics
+        self._client_id = rand_id()
+        self._context = zmq.Context()
+        self._socket = self._context.socket(zmq.SUB)
+        self._socket.setsockopt(zmq.LINGER, 0)
+        self._socket.setsockopt(zmq.RCVTIMEO, 10)
+        self._socket.connect(f"tcp://{address}:{port}")
+
+        self._locks = defaultdict(Lock)
+
+        for topic in self._topics:
+            self.__dict__[topic] = initializer.initialize(topic)
+
+        self._receiver = Thread(
+            target=self.__receive__,
+            args=(self._socket, self._locks, self._client_id, self.__dict__)
+        )
+
+        self._finalizer = weakref.finalize(
+            self,
+            self.__cleanup__,
+            self._socket,
+            self._context,
+            self._receiver
+        )
+
+        self._receiver.start()
+        for topic in self._topics:
+            self._socket.subscribe(f"{self._client_id}{topic}")
 
     @staticmethod
     def __cleanup__(
-        pool: ProcessPoolExecutor,
-        socket: zmq.socket,
+        socket: zmq.Socket,
         context: zmq.Context,
+        receiver: Thread
     ) -> None:
         """
-        Joins the merge task pool, closes the ZMQ socket and context.
+        Closes the ZMQ socket and context and joins the receiver thread.
 
-        :param pool: the ProcessPoolExecutor object to be shutdown.
-        :param socket: the ZMQ socket to be closed.
-        :param context: the ZMQ context to be closed.
+        :param socket: the ZMQ socket object.
+        :param context: the ZMQ context object.
+        :param receiver: the receiver thread object.
         """
         socket.close()
         context.term()
-        pool.shutdown(wait=False, cancel_futures=True)
+        receiver.join()
 
     @staticmethod
-    def __recv__(self_ref: weakref.ReferenceType["DISCOSClient"]) -> None:
+    def __receive__(
+        socket: zmq.Socket,
+        locks: dict[str, Lock],
+        client_id: str,
+        d: dict[str, DISCOSNamespace]
+    ) -> None:
         """
-        Cycles infinitely waiting for new messages. When a new one is received,
-        it submit a merge task to the ProcessPoolExecutor.
+        Loops continuously waiting for new ZMQ messages.
 
-        :param self_ref: weak reference to the DISCOSClient instance.
+        :param socket: the ZMQ socket object.
+        :param locks: the locks dictionary, used for thread synchronization.
+        :param client_id: the random string identifying the client.
+        :param d: the client __dict__ object.
         """
         while True:
-            self = self_ref()
-            if self is None:
-                break
             try:
-                topic, payload = self._socket.recv_multipart(copy=False)
-                topic = memoryview(topic).tobytes().decode("ascii")
-                if topic.startswith(self._client_id):
-                    self._socket.unsubscribe(topic)
-                    topic = topic[len(self._client_id):]
-                    self._socket.subscribe(topic)
-                fut = self._pool.submit(
-                    DISCOSClient.__merge_task__,
-                    topic,
-                    payload.bytes
-                )
-                fut.add_done_callback(
-                    lambda f, w=self_ref: DISCOSClient.__update_task__(w, f)
-                )
+                t, p = socket.recv_multipart()  # noqa
+                t = t.decode("ascii")
+                if t.startswith(client_id):
+                    socket.unsubscribe(t)
+                    t = t[len(client_id):]
+                    socket.subscribe(t)
+                p = json.loads(p)
+                with locks[t]:
+                    d[t] <<= p
             except zmq.Again:
                 # No data received, cycle again
                 pass
-            except (zmq.ContextTerminated, zmq.ZMQError):  # pragma: no cover
-                # Access to socket after it was closed
+            except (zmq.error.ContextTerminated, zmq.error.ZMQError):
                 break
-            except RuntimeError:  # pragma: no cover
-                # Submit after pool shutdown
-                break
-            finally:
-                del self
-
-    @staticmethod
-    def __merge_task__(
-        topic: str,
-        payload: bytes
-    ) -> Tuple[str, DISCOSNamespace]:
-        """
-        Performs the merging between payload and schema. This task can be very
-        CPU expensive, therefore it is executed as a separate process.
-
-        :param topic: The topic on which the payload was received.
-        :param payload: The bytes containing the ZMQ payload.
-        """
-        return topic, SchemaMerger.get_instance().merge_schema(
-            topic,
-            payload
-        )
-
-    @staticmethod
-    def __update_task__(
-        self_ref: weakref.ReferenceType["DISCOSClient"],
-        fut: Future
-    ) -> None:
-        """
-        Updates the inner DISCOSNamespace cache and notifies the waiters.
-
-        :param self_ref: weak reference to the DISCOSClient instance.
-        :param fut: the Future object containing the results of the merge task.
-        """
-        self = self_ref()
-        if self is None:
-            return
-        try:
-            topic, payload = fut.result()
-            with self._locks[topic]:
-                self.__update_namespace__(topic, payload)
-        finally:
-            del self
-
-    def __update_namespace__(
-        self,
-        topic: str,
-        payload: DISCOSNamespace
-    ) -> None:
-        """
-        Updates or sets the given DISCOSNamespace for a given topic.
-
-        :param topic: The topic relative to the given DISCOSNamespace object.
-        :param payload: The new DISCOSNamespace object, used to update
-                        the current one if already present in self.__dict__.
-        """
-        self.__dict__[topic] <<= payload
 
     def __repr__(self) -> str:
         """
@@ -201,7 +139,7 @@ class DISCOSClient:
         """
         Custom string representation method.
 
-        :return: A JSON representation of the object, with indentation=2
+        :return: A JSON representation of the object.
         """
         return format(self, "")
 
@@ -218,6 +156,8 @@ with optional indentation level <n> (default is 2)
             | 'm' - metadata only representation
 
         :return: A JSON formatted string.
+        :raises ValueError: If the given format specifier is not known or
+                            contains errors.
         """
         has_f = "f" in spec
         has_m = "m" in spec
@@ -283,13 +223,11 @@ with optional indentation level <n> (default is 2)
                  DISCOSNamespaces with last received statuses
         """
         result: dict[str, DISCOSNamespace] = {}
-        topics = sorted(self._topics)
-        for topic in topics:
+        for topic in self._topics:
             self._locks[topic].acquire()
-        for topic in topics:
+        for topic in self._topics:
             ns = self.__dict__.get(topic)
-            if ns is not None:
-                result[topic] = ns
-        for topic in topics:
+            result[topic] = ns
+        for topic in self._topics:
             self._locks[topic].release()
         return result
