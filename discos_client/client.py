@@ -63,7 +63,8 @@ class DISCOSClient:
 
         self._receiver = Thread(
             target=self.__receive__,
-            args=(self._socket, self._locks, self._client_id, self.__dict__)
+            args=(self._socket, self._locks, self._client_id, self.__dict__),
+            daemon=True
         )
 
         self._finalizer = weakref.finalize(
