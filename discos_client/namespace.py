@@ -600,7 +600,7 @@ with optional indentation level <n> (default is 2)
                  node, it delegates to `format(self._value, spec)`.
         :raise ValueError: If the format specifier is unknown or malformed.
         """
-        if self.__has_value__(self):
+        if self.__has_value__(self) and not isinstance(self._value, tuple):
             with self._lock:
                 return format(self._value, spec)
 
