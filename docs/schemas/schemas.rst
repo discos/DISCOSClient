@@ -23,6 +23,7 @@ More details regarding each schema can be found in the following sections.
    antenna
    active_surface
    receivers
+   backends
    weather
    mount
    minor_servo
