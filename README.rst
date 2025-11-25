@@ -19,13 +19,12 @@ Features
 --------
 
 - ZeroMQ SUB client for structured telemetry updates
-- Asynchronous and synchronous interface
-- Immutable nested namespaces for safe access
+- Read-only nested namespaces for safe access
 - Lightweight and dependency-minimal
 - JSON schemas used as metadata for message structure
 
-Installation
-------------
+Setup
+-----
 
 Clone the repository and install the package:
 
@@ -42,7 +41,7 @@ Usage Example
 
    from discos_client import DISCOSClient
 
-   SRT = DISCOSClient("mount", address="127.0.0.1")
+   SRT = DISCOSClient("mount", address="127.0.0.1", port=16000)
 
    az = SRT.mount.azimuth.currentPosition
    el = SRT.mount.elevation.currentPosition
