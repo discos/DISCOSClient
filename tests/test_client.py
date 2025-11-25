@@ -5,12 +5,10 @@ import re
 from pathlib import Path
 from threading import Thread, Event
 import zmq
-from discos_client import DISCOSClient
+from discos_client.client import DISCOSClient, DEFAULT_PORT
 
 
 class TestPublisher:
-
-    PORT = 16000
 
     def __init__(self, telescope=None):
         self.context = zmq.Context()
@@ -20,7 +18,7 @@ class TestPublisher:
         # This loop is necessary to wait for the client to close between tests
         while True:
             try:
-                self.socket.bind(f"tcp://127.0.0.1:{self.PORT}")
+                self.socket.bind(f"tcp://127.0.0.1:{DEFAULT_PORT}")
                 break
             except zmq.ZMQError:
                 pass
@@ -114,7 +112,7 @@ class TestDISCOSClient(unittest.TestCase):
     def test_no_topics(self):
         DISCOSClient(
             address="127.0.0.1",
-            port=16000,
+            port=DEFAULT_PORT,
             telescope="SRT"
         )
 
@@ -123,7 +121,7 @@ class TestDISCOSClient(unittest.TestCase):
             DISCOSClient(
                 "foo",
                 address="127.0.0.1",
-                port=16000
+                port=DEFAULT_PORT
             )
         self.assertTrue(
             "Topic 'foo' is not known" in ex.exception.args[0]
@@ -132,28 +130,28 @@ class TestDISCOSClient(unittest.TestCase):
             DISCOSClient(
                 "foo", "bar",
                 address="127.0.0.1",
-                port=16000,
+                port=DEFAULT_PORT,
             )
         self.assertTrue(
             "Topics 'foo' and 'bar' are not known" in ex.exception.args[0]
         )
 
     def test_repr(self):
-        client = DISCOSClient(address="127.0.0.1", port=16000)
+        client = DISCOSClient(address="127.0.0.1", port=DEFAULT_PORT)
         self.assertTrue(
             repr(client).startswith("<DISCOSClient({") and
             repr(client).endswith("})>")
         )
 
     def test_str(self):
-        client = DISCOSClient(address="127.0.0.1", port=16000)
+        client = DISCOSClient(address="127.0.0.1", port=DEFAULT_PORT)
         self.assertTrue(
             str(client).startswith("{") and
             str(client).endswith("}")
         )
 
     def test_format(self):
-        client = DISCOSClient(address="127.0.0.1", port=16000)
+        client = DISCOSClient(address="127.0.0.1", port=DEFAULT_PORT)
         self.assertTrue(
             f"{client:}".startswith("{") and
             f"{client:}".endswith("}")
@@ -204,7 +202,7 @@ class TestDISCOSClient(unittest.TestCase):
 
     def test_bind(self):
         with TestPublisher("SRT"):
-            client = DISCOSClient(address="127.0.0.1", port=16000)
+            client = DISCOSClient(address="127.0.0.1", port=DEFAULT_PORT)
             s = set()
             called = set()
             s.add(id(client.antenna.timestamp.unix_time))
@@ -228,7 +226,7 @@ class TestDISCOSClient(unittest.TestCase):
 
     def test_wait(self):
         with TestPublisher():
-            client = DISCOSClient(address="127.0.0.1", port=16000)
+            client = DISCOSClient(address="127.0.0.1", port=DEFAULT_PORT)
             unix_time = client.antenna.timestamp.unix_time.copy()
             antenna = client.antenna.copy()
             self.assertNotEqual(

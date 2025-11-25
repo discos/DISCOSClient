@@ -1,7 +1,5 @@
 from functools import partial
-from .client import DISCOSClient
-
-DEFAULT_PORT = 16000
+from .client import DISCOSClient, DEFAULT_PORT
 
 SRTClient = partial(
     DISCOSClient,

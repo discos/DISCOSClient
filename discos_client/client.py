@@ -1,12 +1,20 @@
 from __future__ import annotations
 import json
 import weakref
-from threading import Thread, Lock
+from threading import Thread, Lock, Event
 from collections import defaultdict
 import zmq
 from .namespace import DISCOSNamespace
 from .utils import rand_id
 from .initializer import NSInitializer
+
+
+__all__ = [
+    "DEFAULT_PORT",
+    "DISCOSClient"
+]
+
+DEFAULT_PORT = 16000
 
 
 class DISCOSClient:
@@ -50,6 +58,7 @@ class DISCOSClient:
             topics = initializer.get_topics()
         self._topics = topics
         self._client_id = rand_id()
+        self._event = Event()
         self._context = zmq.Context()
         self._socket = self._context.socket(zmq.SUB)
         self._socket.setsockopt(zmq.LINGER, 0)
@@ -63,13 +72,19 @@ class DISCOSClient:
 
         self._receiver = Thread(
             target=self.__receive__,
-            args=(self._socket, self._locks, self._client_id, self.__dict__),
-            daemon=True
+            args=(
+                self._socket,
+                self._locks,
+                self._client_id,
+                self.__dict__,
+                self._event
+            )
         )
 
         self._finalizer = weakref.finalize(
             self,
             self.__cleanup__,
+            self._event,
             self._socket,
             self._context,
             self._receiver
@@ -81,37 +96,42 @@ class DISCOSClient:
 
     @staticmethod
     def __cleanup__(
+        event: Event,
         socket: zmq.Socket,
         context: zmq.Context,
         receiver: Thread
     ) -> None:
         """
-        Closes the ZMQ socket and context and joins the receiver thread.
+        Joins the receiver thread and closes the ZMQ socket and context.
 
+        :param event: the Event object that will stop the receiver thread.
         :param socket: the ZMQ socket object.
         :param context: the ZMQ context object.
         :param receiver: the receiver thread object.
         """
+        event.set()
+        receiver.join()
         socket.close()
         context.term()
-        receiver.join()
 
     @staticmethod
     def __receive__(
         socket: zmq.Socket,
         locks: dict[str, Lock],
         client_id: str,
-        d: dict[str, DISCOSNamespace]
+        d: dict[str, DISCOSNamespace],
+        event: Event
     ) -> None:
         """
         Loops continuously waiting for new ZMQ messages.
 
-        :param socket: the ZMQ socket object.
-        :param locks: the locks dictionary, used for thread synchronization.
-        :param client_id: the random string identifying the client.
-        :param d: the client __dict__ object.
+        :param socket: The ZMQ socket object.
+        :param locks: The locks dictionary, used for thread synchronization.
+        :param client_id: The random string identifying the client.
+        :param d: The client __dict__ object.
+        :param event: The Event object that will break the receiver loop.
         """
-        while True:
+        while not event.is_set():
             try:
                 t, p = socket.recv_multipart()  # noqa
                 t = t.decode("ascii")
@@ -125,8 +145,6 @@ class DISCOSClient:
             except zmq.Again:
                 # No data received, cycle again
                 pass
-            except (zmq.error.ContextTerminated, zmq.error.ZMQError):
-                break
 
     def __repr__(self) -> str:
         """
