@@ -78,7 +78,8 @@ class DISCOSClient:
                 self._client_id,
                 self.__dict__,
                 self._event
-            )
+            ),
+            daemon=True
         )
 
         self._finalizer = weakref.finalize(
