@@ -405,9 +405,9 @@ class NSInitializer:
                     continue
                 merged[k] = v
         if required_fields:
-            merged["required"] = list(required_fields)
+            merged["required"] = list(sorted(required_fields))
         if initialize_fields:
-            merged["initialize"] = list(initialize_fields)
+            merged["initialize"] = list(sorted(initialize_fields))
         return merged
 
     def _replace_patterns_with_properties(
@@ -456,9 +456,10 @@ class NSInitializer:
         schema = self._replace_patterns_with_properties(schema, values)
         properties = schema.get("properties", {})
         required = set(schema.get("required", []))
+        initialize = set(schema.get("initialize", []))
         result: dict[str, Any] = {}
         for key, prop_schema in properties.items():
-            if key in required or key in values:
+            if key in required.union(initialize) or key in values:
                 prop_schema = self._replace_patterns_with_properties(
                     prop_schema,
                     values.get(key, {})
@@ -588,16 +589,12 @@ class NSInitializer:
         :param schema: Fully normalized JSON schema.
         :return: Initial structured payload used to construct a namespace.
         """
-        keys_to_init: set[str] = set(schema.get("required", ()))
-        initialize = schema.get("initialize", [])
-        if isinstance(initialize, list):
-            for k in initialize:
-                if isinstance(k, str):
-                    keys_to_init.add(k)
+        required: set[str] = set(schema.get("required", []))
+        initialize: set[str] = set(schema.get("initialize", []))
         fake_values: dict[str, Any] = {}
         result: dict[str, Any] = {}
 
-        for key in keys_to_init:
+        for key in required.union(initialize):
             prop_schema = self._find_property_schema(schema, key)
             prop_schema = self._replace_patterns_with_properties(
                 prop_schema,

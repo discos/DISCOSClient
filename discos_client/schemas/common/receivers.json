@@ -179,5 +179,8 @@
       "maxProperties": 1,
       "additionalProperties": false
     }
+  ],
+  "initialize": [
+    "boss"
   ]
 }
