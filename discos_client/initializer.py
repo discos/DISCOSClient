@@ -627,9 +627,4 @@ class NSInitializer:
         props = schema.get("properties", {})
         if key in props:
             return props[key]
-        any_of = schema.get("anyOf", [])
-        for candidate in any_of:
-            cprops = candidate.get("properties", {})
-            if key in cprops:
-                return cprops[key]
         return None  # pragma: no cover

@@ -108,102 +108,6 @@
         "DRIVE CABINET ERROR"
       ]
     },
-    "boss": {
-      "type": "object",
-      "title": "Minor Servo Boss",
-      "description": "Status of the DISCOS MinorServoBoss component.",
-      "node": "minor_servo.boss",
-      "properties": {
-        "PLCFirmwareVersion": {
-          "type": "string",
-          "title": "PLC Firmware Version",
-          "description": "Firmware version of the minor servo PLC controller."
-        },
-        "currentSetup": {
-          "type": "string",
-          "title": "Current setup",
-          "description": "Current focal setup."
-        },
-        "emergency": {
-          "type": "boolean",
-          "title": "Emergency",
-          "description": "Minor servo system in emergency status."
-        },
-        "errorCode": {
-          "$ref": "#/$defs/error_code"
-        },
-        "gregorianCoverPosition": {
-          "type": "string",
-          "title": "Gregorian cover position",
-          "description": "Current position of the gregorian cover.",
-          "enum": [
-            "UNKNOWN",
-            "CLOSED",
-            "OPEN"
-          ]
-        },
-        "maintenanceMode": {
-          "type": "boolean",
-          "title": "Maintenance mode",
-          "description": "Minor servo system in maintenance mode."
-        },
-        "motionInfo": {
-          "type": "string",
-          "title": "Motion info",
-          "description": "Information regarding the motion status of the minor servo system.",
-          "enum": [
-            "NOT CONFIGURED",
-            "STARTING",
-            "CONFIGURED",
-            "TRACKING",
-            "PARKING",
-            "PARKED",
-            "ERROR"
-          ]
-        },
-        "scanning": {
-          "type": "boolean",
-          "title": "Scanning",
-          "description": "Minor servo system is performing a scan."
-        },
-        "socketConnected": {
-          "type": "boolean",
-          "title": "Socket connected",
-          "description": "Minor servo system socket is connected."
-        },
-        "status": {
-          "$ref": "../definitions/status.json"
-        },
-        "timestamp": {
-          "$ref": "../definitions/timestamp.json"
-        },
-        "tracking": {
-          "type": "boolean",
-          "title": "Tracking",
-          "description": "Minor servo system is tracking the given coordinates."
-        },
-        "trackingEnabled": {
-          "type": "boolean",
-          "title": "Tracking enabled",
-          "description": "Minor servo system will track the given coordinates."
-        }
-      },
-      "required": [
-        "PLCFirmwareVersion",
-        "currentSetup",
-        "emergency",
-        "errorCode",
-        "gregorianCoverPosition",
-        "maintenanceMode",
-        "motionInfo",
-        "scanning",
-        "socketConnected",
-        "status",
-        "timestamp",
-        "tracking",
-        "trackingEnabled"
-      ]
-    },
     "minor_servo": {
       "type": "object",
       "title": "Minor Servo Status",
@@ -255,9 +159,6 @@
             "PRESET",
             "PROGRAM TRACK"
           ]
-        },
-        "timestamp": {
-          "$ref": "../definitions/timestamp.json"
         }
       },
       "required": [
@@ -267,8 +168,7 @@
         "enabled",
         "errorCode",
         "inUse",
-        "operativeMode",
-        "timestamp"
+        "operativeMode"
       ]
     },
     "tracking_minor_servo": {
@@ -313,171 +213,228 @@
     "axes": {
       "type": "object",
       "title": "Axes",
-      "description": "Minor servo axes information."
+      "description": "Minor servo axes information.",
+      "patternProperties": {
+        "^(TX|TY|TZ)$": {
+          "$ref": "#/$defs/translation_axis_info"
+        },
+        "^(RX|RY|RZ|RTHETA)$": {
+          "$ref": "#/$defs/rotation_axis_info"
+        }
+      }
     }
   },
-  "anyOf": [
-    {
-      "type": "object",
-      "properties": {
-        "boss": { "$ref": "#/$defs/boss" }
-      },
-      "required": ["boss"],
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "properties": {
-        "GFR": {
-          "allOf": [
-            { "$ref": "#/$defs/minor_servo" },
-            {
-              "type": "object",
-              "properties": {
-                "axes": {
-                  "allOf": [
-                    { "$ref": "#/$defs/axes" },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "RZ": { "$ref": "#/$defs/rotation_axis_info" }
-                      },
-                      "required": ["RZ"],
-                      "additionalProperties": false
-                    }
-                  ]
+  "properties": {
+    "GFR": {
+      "allOf": [
+        { "$ref": "#/$defs/minor_servo" },
+        {
+          "type": "object",
+          "properties": {
+            "axes": {
+              "allOf": [
+                { "$ref": "#/$defs/axes" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "RZ": { "$ref": "#/$defs/rotation_axis_info" }
+                  },
+                  "required": ["RZ"],
+                  "additionalProperties": false
                 }
-              },
-              "required": [
-                "axes"
               ]
             }
+          },
+          "required": [
+            "axes"
           ]
         }
-      },
-      "required": ["GFR"],
-      "additionalProperties": false
+      ]
     },
-    {
-      "type": "object",
-      "properties": {
-        "M3R": {
-          "allOf": [
-            { "$ref": "#/$defs/minor_servo" },
-            {
-              "type": "object",
-              "properties": {
-                "axes": {
-                  "allOf": [
-                    { "$ref": "#/$defs/axes" },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "RZ": { "$ref": "#/$defs/rotation_axis_info" }
-                      },
-                      "required": ["RZ"],
-                      "additionalProperties": false
-                    }
-                  ]
+    "M3R": {
+      "allOf": [
+        { "$ref": "#/$defs/minor_servo" },
+        {
+          "type": "object",
+          "properties": {
+            "axes": {
+              "allOf": [
+                { "$ref": "#/$defs/axes" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "RZ": { "$ref": "#/$defs/rotation_axis_info" }
+                  },
+                  "required": ["RZ"],
+                  "additionalProperties": false
                 }
-              },
-              "required": [
-                "axes"
               ]
             }
+          },
+          "required": [
+            "axes"
           ]
         }
-      },
-      "required": ["M3R"],
-      "additionalProperties": false
+      ]
     },
-    {
-      "type": "object",
-      "properties": {
-        "SRP": {
-          "allOf": [
-            { "$ref": "#/$defs/tracking_minor_servo" },
-            {
-              "type": "object",
-              "properties": {
-                "axes": {
-                  "allOf": [
-                    { "$ref": "#/$defs/axes" },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "TX": { "$ref": "#/$defs/translation_axis_info" },
-                        "TY": { "$ref": "#/$defs/translation_axis_info" },
-                        "TZ": { "$ref": "#/$defs/translation_axis_info" },
-                        "RX": { "$ref": "#/$defs/rotation_axis_info" },
-                        "RY": { "$ref": "#/$defs/rotation_axis_info" },
-                        "RZ": { "$ref": "#/$defs/rotation_axis_info" }
-                      },
-                      "required": [
-                        "TX",
-                        "TY",
-                        "TZ",
-                        "RX",
-                        "RY",
-                        "RZ"
-                      ],
-                      "additionalProperties": false
-                    }
-                  ]
+    "SRP": {
+      "allOf": [
+        { "$ref": "#/$defs/tracking_minor_servo" },
+        {
+          "type": "object",
+          "properties": {
+            "axes": {
+              "allOf": [
+                { "$ref": "#/$defs/axes" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "TX": { "$ref": "#/$defs/translation_axis_info" },
+                    "TY": { "$ref": "#/$defs/translation_axis_info" },
+                    "TZ": { "$ref": "#/$defs/translation_axis_info" },
+                    "RX": { "$ref": "#/$defs/rotation_axis_info" },
+                    "RY": { "$ref": "#/$defs/rotation_axis_info" },
+                    "RZ": { "$ref": "#/$defs/rotation_axis_info" }
+                  },
+                  "required": [
+                    "TX",
+                    "TY",
+                    "TZ",
+                    "RX",
+                    "RY",
+                    "RZ"
+                  ],
+                  "additionalProperties": false
                 }
-              },
-              "required": [
-                "axes"
               ]
             }
+          },
+          "required": [
+            "axes"
           ]
         }
-      },
-      "required": ["SRP"],
-      "additionalProperties": false
+      ]
     },
-    {
-      "type": "object",
-      "properties": {
-        "PFP": {
-          "allOf": [
-            { "$ref": "#/$defs/tracking_minor_servo" },
-            {
-              "type": "object",
-              "properties": {
-                "axes": {
-                  "allOf": [
-                    { "$ref": "#/$defs/axes" },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "TX": { "$ref": "#/$defs/translation_axis_info" },
-                        "TZ": { "$ref": "#/$defs/translation_axis_info" },
-                        "RTHETA": { "$ref": "#/$defs/rotation_axis_info" }
-                      },
-                      "required": [
-                        "TX",
-                        "TZ",
-                        "RTHETA"
-                      ],
-                      "additionalProperties": false
-                    }
-                  ]
+    "PFP": {
+      "allOf": [
+        { "$ref": "#/$defs/tracking_minor_servo" },
+        {
+          "type": "object",
+          "properties": {
+            "axes": {
+              "allOf": [
+                { "$ref": "#/$defs/axes" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "TX": { "$ref": "#/$defs/translation_axis_info" },
+                    "TZ": { "$ref": "#/$defs/translation_axis_info" },
+                    "RTHETA": { "$ref": "#/$defs/rotation_axis_info" }
+                  },
+                  "required": [
+                    "TX",
+                    "TZ",
+                    "RTHETA"
+                  ],
+                  "additionalProperties": false
                 }
-              },
-              "required": [
-                "axes"
               ]
             }
+          },
+          "required": [
+            "axes"
           ]
         }
-      },
-      "required": ["PFP"],
-      "additionalProperties": false
+      ]
+    },
+    "PLCFirmwareVersion": {
+      "type": "string",
+      "title": "PLC Firmware Version",
+      "description": "Firmware version of the minor servo PLC controller."
+    },
+    "currentSetup": {
+      "type": "string",
+      "title": "Current setup",
+      "description": "Current focal setup."
+    },
+    "emergency": {
+      "type": "boolean",
+      "title": "Emergency",
+      "description": "Minor servo system in emergency status."
+    },
+    "errorCode": {
+      "$ref": "#/$defs/error_code"
+    },
+    "gregorianCoverPosition": {
+      "type": "string",
+      "title": "Gregorian cover position",
+      "description": "Current position of the gregorian cover.",
+      "enum": [
+        "UNKNOWN",
+        "CLOSED",
+        "OPEN"
+      ]
+    },
+    "maintenanceMode": {
+      "type": "boolean",
+      "title": "Maintenance mode",
+      "description": "Minor servo system in maintenance mode."
+    },
+    "motionInfo": {
+      "type": "string",
+      "title": "Motion info",
+      "description": "Information regarding the motion status of the minor servo system.",
+      "enum": [
+        "NOT CONFIGURED",
+        "STARTING",
+        "CONFIGURED",
+        "TRACKING",
+        "PARKING",
+        "PARKED",
+        "ERROR"
+      ]
+    },
+    "scanning": {
+      "type": "boolean",
+      "title": "Scanning",
+      "description": "Minor servo system is performing a scan."
+    },
+    "socketConnected": {
+      "type": "boolean",
+      "title": "Socket connected",
+      "description": "Minor servo system socket is connected."
+    },
+    "status": {
+      "$ref": "../definitions/status.json"
+    },
+    "timestamp": {
+      "$ref": "../definitions/timestamp.json"
+    },
+    "tracking": {
+      "type": "boolean",
+      "title": "Tracking",
+      "description": "Minor servo system is tracking the given coordinates."
+    },
+    "trackingEnabled": {
+      "type": "boolean",
+      "title": "Tracking enabled",
+      "description": "Minor servo system will track the given coordinates."
     }
-  ],
-  "initialize": [
-    "boss",
+  },
+  "required": [
+    "PLCFirmwareVersion",
+    "currentSetup",
+    "emergency",
+    "errorCode",
+    "gregorianCoverPosition",
+    "maintenanceMode",
+    "motionInfo",
+    "scanning",
+    "socketConnected",
+    "status",
+    "timestamp",
+    "tracking",
+    "trackingEnabled",
     "GFR",
     "M3R",
     "SRP"

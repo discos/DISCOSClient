@@ -6,37 +6,6 @@
   "description": "Status of the telescope receivers.",
   "node": "receivers",
   "$defs": {
-    "boss": {
-      "type": "object",
-      "title": "Receivers Boss",
-      "description": "Status of the DISCOS ReceiversBoss component.",
-      "node": "receivers.boss",
-      "properties": {
-        "currentReceiver": {
-          "type": "string",
-          "title": "Current Receiver",
-          "description": "Currently selected receiver's name."
-        },
-        "currentSetup": {
-          "type": "string",
-          "title": "Current setup",
-          "description": "Current DISCOS setup code"
-        },
-        "status": {
-          "$ref": "../definitions/status.json"
-        },
-        "timestamp": {
-          "$ref": "../definitions/timestamp.json"
-        }
-      },
-      "required": [
-        "currentReceiver",
-        "currentSetup",
-        "status",
-        "timestamp"
-      ],
-      "additionalProperties": false
-    },
     "receiver": {
       "type": "object",
       "title": "Receiver status",
@@ -165,22 +134,38 @@
     {
       "type": "object",
       "properties": {
-        "boss": { "$ref": "#/$defs/boss" }
+        "currentReceiver": {
+          "type": "string",
+          "title": "Current Receiver",
+          "description": "Currently selected receiver's name."
+        },
+        "currentSetup": {
+          "type": "string",
+          "title": "Current setup",
+          "description": "Current DISCOS setup code"
+        },
+        "status": {
+          "$ref": "../definitions/status.json"
+        },
+        "timestamp": {
+          "$ref": "../definitions/timestamp.json"
+        }
       },
-      "required": ["boss"],
-      "additionalProperties": false
+      "required": [
+        "currentReceiver",
+        "currentSetup",
+        "status",
+        "timestamp"
+      ]
     },
     {
       "type": "object",
       "patternProperties": {
-        "^(?!boss$)[A-Za-z0-9_]+$": { "$ref": "#/$defs/receiver" }
+        "^[A-Za-z0-9_]+$": { "$ref": "#/$defs/receiver" }
       },
       "minProperties": 1,
       "maxProperties": 1,
       "additionalProperties": false
     }
-  ],
-  "initialize": [
-    "boss"
   ]
 }

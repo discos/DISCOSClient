@@ -19,11 +19,11 @@ More details regarding each schema can be found in the following sections.
    :maxdepth: 2
 
    definitions
-   scheduler
-   antenna
    active_surface
-   receivers
+   antenna
    backends
-   weather
-   mount
    minor_servo
+   mount
+   receivers
+   scheduler
+   weather
