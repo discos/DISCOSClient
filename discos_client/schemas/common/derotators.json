@@ -1,0 +1,163 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "common/derotators.json",
+  "title": "Derotators status",
+  "type": "object",
+  "description": "Status of the telescope derotators.",
+  "node": "derotators",
+  "$defs": {
+    "derotator": {
+      "title": "Derotator",
+      "type": "object",
+      "description": "Derotator status.",
+      "node": "derotators.<derotatorName>",
+      "properties": {
+        "commandedPosition": {
+          "type": "number",
+          "title": "Commanded Position",
+          "description": "Commanded position of the derotator",
+          "unit": "degrees"
+        },
+        "currentPosition": {
+          "type": "number",
+          "title": "Current Position",
+          "description": "Current position of the derotator.",
+          "unit": "degrees"
+        },
+        "maxLimit": {
+          "type": "number",
+          "title": "Max Limit",
+          "description": "Maximum limit of the derotator's range.",
+          "unit": "degrees"
+        },
+        "minLimit": {
+          "type": "number",
+          "title": "Min Limit",
+          "description": "Minimum limit of the derotator's range",
+          "unit": "degrees"
+        },
+        "ready": {
+          "type": "boolean",
+          "title": "Ready",
+          "description": "Indicates whether the derotator is ready or not."
+        },
+        "rewindingStep": {
+          "type": "number",
+          "title": "Rewinding Step",
+          "description": "Derotator's angle between two external feeds.",
+          "unit": "degrees"
+        },
+        "slewing": {
+          "type": "boolean",
+          "title": "Slewing",
+          "description": "Indicates whether the derotator is currently slewing."
+        },
+        "timestamp": {
+          "$ref": "../definitions/timestamp.json"
+        },
+        "tracking": {
+          "type": "boolean",
+          "title": "Tracking",
+          "description": "Indicates whether the derotator is tracking the commanded position."
+        },
+        "trackingError": {
+          "type": "number",
+          "title": "Tracking Error",
+          "description": "Derotator tracking error.",
+          "unit": "degrees"
+        }
+      },
+      "required": [
+        "commandedPosition",
+        "currentPosition",
+        "maxLimit",
+        "minLimit",
+        "ready",
+        "rewindingStep",
+        "slewing",
+        "timestamp",
+        "tracking",
+        "trackingError"
+      ]
+    }
+  },
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "currentConfiguration": {
+          "type": "string",
+          "title": "Current Configuration",
+          "description": "Currently selected derotator configuration."
+        },
+        "currentDerotator": {
+          "type": "string",
+          "title": "Current Derotator",
+          "description": "Currently selected derotator's name."
+        },
+        "currentSetup": {
+          "type": "string",
+          "title": "Current setup",
+          "description": "Current DISCOS setup code."
+        },
+        "rewinding": {
+          "type": "boolean",
+          "title": "Rewinding",
+          "description": "Indicates whether the current derotator is rewinding."
+        },
+        "rewindingMode": {
+          "type": "string",
+          "title": "Rewinding Mode",
+          "description": "The derotator positioner rewinding mode.",
+          "enum": [
+            "AUTO",
+            "MANUAL",
+            "NONE"
+          ]
+        },
+        "rewindingRequired": {
+          "type": "boolean",
+          "title": "Rewinding Required",
+          "description": "Indicates whether the current derotator requires to be rewinded."
+        },
+        "status": {
+          "$ref": "../definitions/status.json"
+        },
+        "timestamp": {
+          "$ref": "../definitions/timestamp.json"
+        },
+        "tracking": {
+          "type": "boolean",
+          "title": "Tracking",
+          "description": "Indicates whether the current derotator is tracking the commanded position."
+        },
+        "updating": {
+          "type": "boolean",
+          "title": "Updating",
+          "description": "Indicates whether the derotator positioner is updating the position."
+        }
+      },
+      "required": [
+        "currentConfiguration",
+        "currentDerotator",
+        "currentSetup",
+        "rewinding",
+        "rewindingMode",
+        "rewindingRequired",
+        "status",
+        "timestamp",
+        "tracking",
+        "updating"
+      ]
+    },
+    {
+      "type": "object",
+      "patternProperties": {
+        "^[A-Za-z0-9_]+$": { "$ref": "#/$defs/derotator" }
+      },
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false
+    }
+  ]
+}

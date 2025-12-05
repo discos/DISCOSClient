@@ -5,7 +5,7 @@ from sphinx.ext.autodoc import ClassDocumenter
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.abspath('../discos_client'))
 
-from patches import _simpletype, _complexstructures, _reference
+from patches import _simpletype, _complexstructures, _reference, _transform
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -93,3 +93,4 @@ sjs_wide_format = importlib.import_module("sphinx-jsonschema.wide_format")
 sjs_wide_format.WideFormat._simpletype = _simpletype
 sjs_wide_format.WideFormat._complexstructures = _complexstructures
 sjs_wide_format.WideFormat._reference = _reference
+sjs_wide_format.WideFormat.transform = _transform

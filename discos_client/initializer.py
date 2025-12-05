@@ -573,6 +573,33 @@ class NSInitializer:
         out["value"] = value
         return out
 
+    def _collect_init_keys(
+        self,
+        schema: dict[str, Any]
+    ) -> tuple[set[str], set[str]]:
+        """
+        Recursively collect all ``required`` and ``initialize`` fields declared
+        in a schema, including those defined inside ``anyOf`` branches.
+
+        :param schema: A JSON Schema object, potentially containing ``anyOf``
+                       branches and local ``required`` / ``initialize``
+                       sections.
+        :return: A tuple where each element is a set of field names
+                 aggregated from the entire schema hierarchy.
+        """
+        required: set[str] = set(schema.get("required", []))
+        initialize: set[str] = set(schema.get("initialize", []))
+
+        any_of = schema.get("anyOf")
+        if isinstance(any_of, list):
+            for alt in any_of:
+                if isinstance(alt, dict):
+                    r_alt, i_alt = self._collect_init_keys(alt)
+                    required |= r_alt
+                    initialize |= i_alt
+
+        return required, initialize
+
     def _initialize_from_schema(
         self,
         schema: dict[str, Any]
@@ -589,13 +616,13 @@ class NSInitializer:
         :param schema: Fully normalized JSON schema.
         :return: Initial structured payload used to construct a namespace.
         """
-        required: set[str] = set(schema.get("required", []))
-        initialize: set[str] = set(schema.get("initialize", []))
-        fake_values: dict[str, Any] = {}
+        required, initialize = self._collect_init_keys(schema)
         result: dict[str, Any] = {}
 
         for key in required.union(initialize):
             prop_schema = self._find_property_schema(schema, key)
+            if prop_schema is None:  # pragma: no cover
+                continue
             prop_schema = self._replace_patterns_with_properties(
                 prop_schema,
                 {}
@@ -603,7 +630,7 @@ class NSInitializer:
             result[key] = self._enrich_named_property(
                 key,
                 prop_schema,
-                fake_values
+                {}
             )
         meta = self._meta(schema)
         meta.update(result)
@@ -627,4 +654,11 @@ class NSInitializer:
         props = schema.get("properties", {})
         if key in props:
             return props[key]
+        any_of = schema.get("anyOf")
+        if isinstance(any_of, list):
+            for alt in any_of:
+                if isinstance(alt, dict):
+                    found = self._find_property_schema(alt, key)
+                    if found is not None:
+                        return found
         return None  # pragma: no cover

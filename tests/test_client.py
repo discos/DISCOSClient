@@ -33,6 +33,19 @@ class TestPublisher:
             with open(message, "r", encoding="utf-8") as f:
                 topic_name = message.stem
                 self.messages[topic_name] = json.load(f)
+        self.timestamps = []
+
+        def recurse(obj):
+            if isinstance(obj, dict):
+                if "unix_time" in obj:
+                    self.timestamps.append(obj)
+                for v in obj.values():
+                    recurse(v)
+            elif isinstance(obj, list):
+                for item in obj:
+                    recurse(item)
+        for payload in self.messages.values():
+            recurse(payload)
         self.t = Thread(target=self.publish)
         self.event = Event()
         self.t.start()
@@ -80,8 +93,9 @@ class TestPublisher:
                         ])
 
     def _send_periodic_messages(self):
+        for timestamp in self.timestamps:
+            timestamp["unix_time"] = time.time()
         for topic, payload in self.messages.items():
-            payload["timestamp"]["unix_time"] = time.time()
             if "." in topic:
                 topic, obj = topic.split(".", 1)
                 payload = {obj: payload}
