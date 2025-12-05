@@ -15,3 +15,24 @@
 .rst-content table.docutils th {
     white-space: pre-wrap;
 }
+.rst-content table.docutils tr.row-border-0 td,
+.rst-content table.docutils tr.row-border-0 th,
+.rst-content table.docutils tr.row-border-1 td:nth-child(n+2),
+.rst-content table.docutils tr.row-border-1 th:nth-child(n+2),
+.rst-content table.docutils tr.row-border-2 td:nth-child(n+3),
+.rst-content table.docutils tr.row-border-2 th:nth-child(n+3)
+{
+    border-top: 2px solid #777;
+    font-size: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+.rst-content table.docutils tr.row-hidden-0 td,
+.rst-content table.docutils tr.row-hidden-0 th,
+.rst-content table.docutils tr.row-hidden-1 td:nth-child(n+2),
+.rst-content table.docutils tr.row-hidden-1 th:nth-child(n+2),
+.rst-content table.docutils tr.row-hidden-2 td:nth-child(n+3),
+.rst-content table.docutils tr.row-hidden-2 th:nth-child(n+3)
+{
+    display: none;
+}

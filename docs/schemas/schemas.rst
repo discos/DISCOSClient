@@ -22,6 +22,7 @@ More details regarding each schema can be found in the following sections.
    active_surface
    antenna
    backends
+   derotators
    minor_servo
    mount
    receivers

@@ -2,7 +2,72 @@ import os
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
+from docutils import nodes
 sys.path.insert(0, os.path.abspath('../discos_client'))
+
+SEP = "__SEP__"
+SEP_TOP = "__SEP_TOP__"
+SEP_BOTTOM = "__SEP_BOTTOM__"
+
+
+def _transform(self, schema):
+    body, definitions = self._dispatch(schema)
+    table = None
+    if len(body) > 0:
+        cols, head, body = self._cover(schema, body)
+        table = self.state.build_table((cols, head, body), self.lineno)
+    if table is None:
+        return table, definitions
+
+    for tbody in table.traverse(nodes.tbody):
+        levels = {}
+        for idx, row in enumerate(tbody.children):
+            if not isinstance(row, nodes.row):
+                continue
+            entries = [c for c in row.children if isinstance(c, nodes.entry)]
+            if not entries:
+                continue
+            cell_texts = [e.astext().strip() for e in entries]
+            if SEP_TOP in cell_texts:
+                marker = SEP_TOP
+            elif SEP in cell_texts:
+                marker = SEP
+            elif SEP_BOTTOM in cell_texts:
+                marker = SEP_BOTTOM
+            else:
+                continue
+            sep_index = next(
+                (i for i, txt in enumerate(cell_texts) if marker in txt),
+                0
+            )
+            level = max(0, min(sep_index, 4))
+            levels[idx] = level
+            for e in entries:
+                for child in list(e.children):
+                    if marker in e.astext():
+                        e.remove(child)
+        consecutives = consecutive_groups(list(levels.keys()))
+        for lst in consecutives:
+            level = levels[lst[-1]]
+            tbody.children[lst[-1]]['classes'].append(f"row-border-{level}")
+            for idx in lst[:-1]:
+                l = levels[idx]
+                tbody.children[idx]['classes'].append(f"row-hidden-{l}")
+    return table, definitions
+
+def consecutive_groups(lst):
+    if not lst:
+        return []
+    groups = []
+    current = [lst[0]]
+    for x in lst[1:]:
+        if x == current[-1] + 1:
+            current.append(x)
+        else:
+            groups.append(current)
+            current = [x]
+    groups.append(current)
+    return groups
 
 def _simpletype(self, schema):
     """Render the *extra* ``units`` schema property for every object."""
@@ -45,22 +110,36 @@ def _simpletype(self, schema):
     rows.extend(self._kvpairs(schema, self.KV_SIMPLE))
     return rows
 
+
 def _complexstructures(self, schema):
     rows = []
-
     for k in self.COMBINATORS:
-        # combinators belong at this level as alternative to type
         if k in schema:
-            items = []
-            for s in schema[k]:
-                content = self._dispatch(s)[0]
-                if content:
+            if k in ['anyOf', 'allOf']:
+                if k == 'anyOf':
+                    label = self._cell('any of the following')
+                else:
+                    label = self._cell('all the properties of')
+                items = []
+                items.append(self._line(self._cell(SEP_TOP)))
+                for idx, s in enumerate(schema[k]):
+                    content = self._dispatch(s)[0]
+                    if not content:
+                        continue
+                    if idx > 0:
+                        items.append(self._line(self._cell(SEP)))
                     items.extend(content)
-            if items:
-                key = k
-                if k == 'allOf':
-                    key = 'all properties of'
-                rows.extend(self._prepend(self._cell(key), items))
+                if items:
+                    items.append(self._line(self._cell(SEP_BOTTOM)))
+                    rows.extend(self._prepend(label, items))
+            else:
+                items = []
+                for s in schema[k]:
+                    content = self._dispatch(s)[0]
+                    if content:
+                        items.extend(content)
+                if items:
+                    rows.extend(self._prepend(self._cell(k), items))
             del schema[k]
 
     for k in self.SINGLEOBJECTS:
@@ -70,7 +149,7 @@ def _complexstructures(self, schema):
             del schema[k]
 
     if self.CONDITIONAL[0] in schema:
-        # only if 'if' in schema there would be a needs to go through if, then & else
+        # only if 'if' in schema there would be a need to go through if, then & else
         items = []
         for k in self.CONDITIONAL:
             if k in schema:
@@ -81,7 +160,6 @@ def _complexstructures(self, schema):
         if len(items) >= 2:
             for item in items:
                 rows.extend(item)
-
     return rows
 
 
