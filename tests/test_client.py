@@ -2,6 +2,8 @@ import json
 import unittest
 import time
 import re
+import asyncio
+import sys
 from unittest.mock import patch
 from pathlib import Path
 from threading import Thread, Event
@@ -10,6 +12,10 @@ from zmq.auth import load_certificate
 from zmq.auth.thread import ThreadAuthenticator
 from discos_client.client import DISCOSClient, \
     DEFAULT_SUB_PORT, DEFAULT_REQ_PORT
+
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 keys_path = Path(__file__).resolve().parent / "test_keys"
 dummy_public, dummy_secret = load_certificate(

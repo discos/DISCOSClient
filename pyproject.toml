@@ -29,5 +29,5 @@ discos-keygen = "discos_client.cli:main"
 discos_client = ["schemas/**", "servers/**"]
 
 [project.optional-dependencies]
-test = ["coverage", "prospector", "jsonschema", "referencing", "tornado"]
+test = ["coverage", "prospector", "jsonschema", "referencing"]
 docs = ["sphinx<9,>=6", "sphinx-rtd-theme", "sphinx-autodoc-typehints", "sphinx-jsonschema"]
