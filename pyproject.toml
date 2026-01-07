@@ -16,13 +16,15 @@ classifiers = [
 ]
 dependencies = [
     "pyzmq",
+    "platformdirs"
 ]
 
 [tool.setuptools]
 packages = ["discos_client"]
+script-files = ["scripts/discos-keygen"]
 
 [tool.setuptools.package-data]
-"discos_client" = ["schemas/**"]
+"discos_client" = ["schemas/**", "servers/**"]
 
 [project.optional-dependencies]
 test = ["coverage", "prospector", "jsonschema", "referencing"]

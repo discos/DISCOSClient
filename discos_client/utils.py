@@ -3,6 +3,10 @@ import operator
 import secrets
 import string
 from typing import Any, Callable
+from importlib.resources import files
+from pathlib import Path
+from zmq.auth import load_certificate
+from platformdirs import user_config_dir
 
 
 __all__ = [
@@ -10,7 +14,8 @@ __all__ = [
     "rand_id",
     "delegated_operations",
     "delegated_comparisons",
-    "public_dict"
+    "public_dict",
+    "get_auth_keys"
 ]
 
 META_KEYS = ("type", "title", "description", "format", "unit", "enum")
@@ -145,3 +150,22 @@ def __unwrap(value: Any, is_fn, get_value_fn) -> Any:
     while is_fn(value):
         value = get_value_fn(value)
     return list(value) if isinstance(value, (list, tuple)) else value
+
+
+def get_auth_keys(telescope: str) -> tuple[bytes]:
+    """Retrieves the CURVE authentication keys, both for the client and
+    the desired server.
+
+    :param telescope: The telescope for which the server public key will be
+                      retrieved.
+    :return: The client's public and secret keys, followed by the server's
+             public key, as a tuple.
+    """
+    config_base = Path(user_config_dir("discos"))
+    curve_directory = config_base / "rpc" / "client"
+    client_pair = curve_directory / "identity.key_secret"
+    server_pair = files("discos_client") / "servers" \
+        / telescope.lower() / "server.key"
+    client_public, client_secret = load_certificate(client_pair)
+    server_public, _ = load_certificate(server_pair)
+    return client_public, client_secret, server_public

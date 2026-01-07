@@ -3,18 +3,22 @@ import json
 import weakref
 from threading import Thread, Lock, Event
 from collections import defaultdict
+from typing import Any
 import zmq
+from zmq.utils.monitor import recv_monitor_message
 from .namespace import DISCOSNamespace
-from .utils import rand_id
+from .utils import rand_id, get_auth_keys
 from .initializer import NSInitializer
 
 
 __all__ = [
-    "DEFAULT_PORT",
+    "DEFAULT_SUB_PORT",
+    "DEFAULT_REQ_PORT",
     "DISCOSClient"
 ]
 
-DEFAULT_PORT = 16000
+DEFAULT_SUB_PORT = 16000
+DEFAULT_REQ_PORT = 16010
 
 
 class DISCOSClient:
@@ -27,7 +31,8 @@ class DISCOSClient:
         self,
         *topics: str,
         address: str,
-        port: int,
+        sub_port: int,
+        req_port: int | None = None,
         telescope: str | None = None
     ) -> None:
         """
@@ -35,49 +40,50 @@ class DISCOSClient:
 
         :param topics: topic names to subscribe to.
         :param address: IP address to subscribe to.
-        :param port: TCP port to subscribe to.
+        :param sub_port: TCP port where the subscriber socket will connect.
+        :param req_port: TCP port where the requester socket will connect.
         :param telescope: name of the telescope the client is connecting to.
         :raises ValueError: If one or more given topics are not known.
         """
+        if telescope not in ("Medicina", "Noto", "SRT", None):
+            raise ValueError(f"Unknown telescope: '{telescope}'")
         initializer = NSInitializer(telescope)
-        valid_topics = initializer.get_topics()
-        invalid = [t for t in topics if t not in valid_topics]
-        if invalid:
-            if len(invalid) > 1:
-                invalid = \
-                    f"""s '{"', '".join(invalid[:-1])}'""" \
-                    f" and '{invalid[-1]}' are"
-            else:
-                invalid = f""" '{invalid[0]}' is"""
-            raise ValueError(
-                f"Topic{invalid} not known, choose among "
-                f"""'{"', '".join(valid_topics[:-1])} and """
-                f"'{valid_topics[-1]}'"
-            )
-        if not topics:
-            topics = initializer.get_topics()
-        self._topics = topics
+        self._topics = self.__validate_topics__(initializer, topics)
         self._client_id = rand_id()
-        self._event = Event()
+        self._stop = Event()
         self._context = zmq.Context()
-        self._socket = self._context.socket(zmq.SUB)
-        self._socket.setsockopt(zmq.LINGER, 0)
-        self._socket.setsockopt(zmq.RCVTIMEO, 10)
-        self._socket.connect(f"tcp://{address}:{port}")
+
+        events = {}
+        events["stop"] = self._stop
+
+        self._sub = self._context.socket(zmq.SUB)
+        self._sub.setsockopt(zmq.LINGER, 0)
+        self._sub.setsockopt(zmq.RCVTIMEO, 10)
+        self._sub.setsockopt(zmq.RECONNECT_IVL, 1000)
+        self._sub.setsockopt(zmq.CONNECT_TIMEOUT, 500)
+        self._sub.connect(f"tcp://{address}:{sub_port}")
+
+        sockets = {}
+        sockets["sub"] = self._sub
+
+        if req_port and telescope:
+            self.__init_req_socket__(
+                address, req_port, telescope, events, sockets
+            )
 
         self._locks = defaultdict(Lock)
 
         for topic in self._topics:
             self.__dict__[topic] = initializer.initialize(topic)
 
-        self._receiver = Thread(
-            target=self.__receive__,
+        self._updater = Thread(
+            target=self.__update__,
             args=(
-                self._socket,
-                self._locks,
                 self._client_id,
+                sockets,
+                self._locks,
                 self.__dict__,
-                self._event
+                events,
             ),
             daemon=True
         )
@@ -85,67 +91,181 @@ class DISCOSClient:
         self._finalizer = weakref.finalize(
             self,
             self.__cleanup__,
-            self._event,
-            self._socket,
-            self._context,
-            self._receiver
+            self._stop,
+            self._updater,
+            sockets,
+            self._context
         )
 
-        self._receiver.start()
+        self._updater.start()
         for topic in self._topics:
-            self._socket.subscribe(f"{self._client_id}{topic}")
+            self._sub.subscribe(f"{self._client_id}{topic}")
+
+    def __init_req_socket__(
+        self,
+        address: str,
+        req_port: int,
+        telescope: str,
+        events: dict[str, Event],
+        sockets: dict[str, zmq.Socket]
+    ) -> None:
+        try:
+            client_public, client_secret, server_public = get_auth_keys(
+                telescope
+            )
+        except OSError:
+            # A curve key is missing, this
+            # telemetry and will not be able to send commands
+            return
+        self._req = self._context.socket(zmq.REQ)
+        self._req.setsockopt(zmq.LINGER, 0)
+        self._req.setsockopt(zmq.IMMEDIATE, 1)
+        self._req.setsockopt(zmq.SNDTIMEO, 0)
+        self._req.setsockopt(zmq.RECONNECT_IVL, 1000)
+        self._req.setsockopt(zmq.CONNECT_TIMEOUT, 500)
+        self._req.setsockopt(zmq.HEARTBEAT_IVL, 1000)
+        self._req.setsockopt(zmq.HEARTBEAT_TIMEOUT, 1000)
+        self._req.curve_publickey = client_public
+        self._req.curve_secretkey = client_secret
+        self._req.curve_serverkey = server_public
+        self._mon = self._req.get_monitor_socket()
+        self._online = Event()
+        events["online"] = self._online
+        self._req.connect(f"tcp://{address}:{req_port}")
+        sockets["req"] = self._req
+        sockets["mon"] = self._mon
+        self.command = self.__command__
+
+    @staticmethod
+    def __validate_topics__(
+        initializer: NSInitializer,
+        topics: tuple[str]
+    ) -> list[str]:
+        valid_topics = initializer.get_topics()
+        invalid = [t for t in topics if t not in valid_topics]
+        if not invalid:
+            return topics or valid_topics
+
+        if len(invalid) > 1:
+            invalid = f"""s '{"', '".join(invalid[:-1])}'""" \
+                      f" and '{invalid[-1]}' are"
+        else:
+            invalid = f""" '{invalid[0]}' is"""
+
+        raise ValueError(
+            f"Topic{invalid} not known, choose among "
+            f"""'{"', '".join(valid_topics[:-1])} and """
+            f"'{valid_topics[-1]}'"
+        )
 
     @staticmethod
     def __cleanup__(
-        event: Event,
-        socket: zmq.Socket,
-        context: zmq.Context,
-        receiver: Thread
+        stop: Event,
+        updater: Thread,
+        sockets: dict[str, zmq.Socket],
+        context: zmq.Context
     ) -> None:
         """
-        Joins the receiver thread and closes the ZMQ socket and context.
+        Joins the updater thread and closes the ZMQ sockets and context.
 
-        :param event: the Event object that will stop the receiver thread.
-        :param socket: the ZMQ socket object.
+        :param stop: the Event object that will stop the updater thread.
+        :param sub: the ZMQ SUB socket object.
         :param context: the ZMQ context object.
-        :param receiver: the receiver thread object.
+        :param updater: the updater thread object.
         """
-        event.set()
-        receiver.join()
-        socket.close()
+        stop.set()
+        try:
+            updater.join()
+        except RuntimeError:  # pragma: no cover
+            pass
+        for _, socket in sockets.items():
+            socket.disable_monitor()
+            socket.close()
         context.term()
 
     @staticmethod
-    def __receive__(
-        socket: zmq.Socket,
-        locks: dict[str, Lock],
+    def __update__(
         client_id: str,
-        d: dict[str, DISCOSNamespace],
-        event: Event
+        sockets: dict[str, zmq.Socket],
+        locks: dict[str, Lock],
+        namespaces: dict[str, DISCOSNamespace],
+        events: dict[str, Event]
     ) -> None:
         """
-        Loops continuously waiting for new ZMQ messages.
+        Loops continuously waiting for new ZMQ messages and events.
 
-        :param socket: The ZMQ socket object.
-        :param locks: The locks dictionary, used for thread synchronization.
         :param client_id: The random string identifying the client.
-        :param d: The client __dict__ object.
-        :param event: The Event object that will break the receiver loop.
+        :param sockets: The dictionary containing the ZMQ sockets.
+        :param locks: The locks dictionary, used for thread synchronization.
+        :param namespaces: The client __dict__ object, containing the
+                           DISCOSNamespaces.
+        :param events: The dictionary containing the Event objects for
+                       synchronization.
         """
-        while not event.is_set():
+        sub = sockets.get("sub")
+        mon = sockets.get("mon")
+        stop = events.get("stop")
+        online = events.get("online")
+
+        poller = zmq.Poller()
+        poller.register(sub, zmq.POLLIN)
+        if mon is not None:
+            poller.register(mon, zmq.POLLIN)
+        while not stop.is_set():
+            zmq_events = {}
             try:
-                t, p = socket.recv_multipart()  # noqa
-                t = t.decode("ascii")
-                if t.startswith(client_id):
-                    socket.unsubscribe(t)
-                    t = t[len(client_id):]
-                    socket.subscribe(t)
-                p = json.loads(p)
-                with locks[t]:
-                    d[t] <<= p
-            except zmq.Again:
-                # No data received, cycle again
-                pass
+                zmq_events = dict(poller.poll(timeout=200))
+            except zmq.ZMQError:  # pragma: no cover
+                break
+
+            if sub in zmq_events:
+                try:
+                    t, p = sub.recv_multipart(flags=zmq.DONTWAIT)  # noqa
+                    t = t.decode("ascii")
+                    if t.startswith(client_id):
+                        sub.unsubscribe(t)
+                        t = t[len(client_id):]
+                        sub.subscribe(t)
+                    p = json.loads(p)
+                    with locks[t]:
+                        namespaces[t] <<= p
+                except zmq.Again:  # pragma: no cover
+                    # We should never get here since there will always be
+                    # some data to recover from the socket
+                    pass
+
+            if mon is not None and mon in zmq_events:
+                while True:
+                    try:
+                        event = recv_monitor_message(mon, flags=zmq.DONTWAIT)
+                    except zmq.Again:
+                        break
+
+                    event = event["event"]
+                    if event == zmq.EVENT_CONNECTED:
+                        online.set()
+                    elif event in \
+                            (zmq.EVENT_DISCONNECTED, zmq.EVENT_CLOSED):
+                        online.clear()
+
+    def __command__(self, cmd: str, *args) -> dict[str, Any]:
+        if self._online.is_set():
+            message = {"command": cmd}
+            if args:
+                message["args"] = args
+            payload = json.dumps(message, separators=(",", ":"))
+            self._req.send_string(payload)
+            answer = json.loads(self._req.recv_string())
+        else:
+            answer = {
+                "executed": False,
+                "error": {
+                    "type": 2101,  # ClientErrors
+                    "code": 14,    # DISCOSUnreachableError
+                    "description": "DISCOS is unreachable"
+                }
+            }
+        return answer
 
     def __repr__(self) -> str:
         """

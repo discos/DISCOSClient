@@ -2,26 +2,57 @@ import json
 import unittest
 import time
 import re
+from unittest.mock import patch
 from pathlib import Path
 from threading import Thread, Event
 import zmq
-from discos_client.client import DISCOSClient, DEFAULT_PORT
+from zmq.auth import load_certificate
+from zmq.auth.thread import ThreadAuthenticator
+from discos_client.client import DISCOSClient, \
+    DEFAULT_SUB_PORT, DEFAULT_REQ_PORT
+
+keys_path = Path(__file__).resolve().parent / "test_keys"
+dummy_public, dummy_secret = load_certificate(
+    keys_path / "dummy.key_secret"
+)
 
 
 class TestPublisher:
 
-    def __init__(self, telescope=None):
+    def __init__(self, telescope=None, router=False):
         self.context = zmq.Context()
-        self.socket = self.context.socket(zmq.XPUB)
-        self.socket.setsockopt(zmq.LINGER, 0)
-        self.socket.setsockopt(zmq.SNDHWM, 10)
+        self.pub = self.context.socket(zmq.XPUB)
+        self.pub.setsockopt(zmq.LINGER, 0)
+        self.pub.setsockopt(zmq.SNDHWM, 10)
+        self.router = self.context.socket(zmq.ROUTER)
+        self.router.curve_publickey = dummy_public
+        self.router.curve_secretkey = dummy_secret
+        self.router.curve_server = True
+        self.auth = ThreadAuthenticator(self.context)
+        self.auth.configure_curve(domain="*", location=keys_path)
         # This loop is necessary to wait for the client to close between tests
         while True:
             try:
-                self.socket.bind(f"tcp://127.0.0.1:{DEFAULT_PORT}")
+                self.pub.bind(f"tcp://127.0.0.1:{DEFAULT_SUB_PORT}")
                 break
             except zmq.ZMQError:
-                pass
+                continue
+        if router:
+            while True:
+                try:
+                    self.auth.start()
+                    break
+                except zmq.ZMQError:
+                    continue
+            while True:
+                try:
+                    self.router.bind(f"tcp://127.0.0.1:{DEFAULT_REQ_PORT}")
+                    break
+                except zmq.ZMQError:
+                    continue
+        self.poller = zmq.Poller()
+        self.poller.register(self.pub, zmq.POLLIN)
+        self.poller.register(self.router, zmq.POLLIN)
         messages_dir = Path(__file__).resolve().parent / "messages"
         message_files = list(messages_dir.glob("common/*.json"))
         if telescope:
@@ -46,34 +77,32 @@ class TestPublisher:
                     recurse(item)
         for payload in self.messages.values():
             recurse(payload)
-        self.t = Thread(target=self.publish)
+        self.t = Thread(target=self.loop)
         self.event = Event()
         self.t.start()
 
     def __enter__(self):
         return self
 
-    def _handle_subscription(self):
-        while True:
-            try:
-                event = self.socket.recv(flags=zmq.DONTWAIT)
-            except zmq.Again:
-                break
-            if not event:
-                continue
+    def _handle_events(self):
+        zmq_events = {}
+        try:
+            zmq_events = dict(self.poller.poll(timeout=200))
+        except zmq.ZMQError:
+            return
+
+        if self.pub in zmq_events:
+            event = self.pub.recv(flags=zmq.DONTWAIT)
             op = event[0]
             topic = event[1:].decode(errors="ignore")
-            if op != 1:
-                continue
-
-            if re.match(r"^[0-9A-Za-z]{4}_.+$", topic):
+            if op == 1 and re.match(r"^[0-9A-Za-z]{4}_.+$", topic):
                 t = topic.split("_", 1)[1]
                 if t in self.messages:
                     message = json.dumps(
                         self.messages[t],
                         separators=(",", ":")
                     ).encode("utf-8")
-                    self.socket.send_multipart([
+                    self.pub.send_multipart([
                         topic.encode("ascii"),
                         message
                     ])
@@ -88,9 +117,23 @@ class TestPublisher:
                             subparts,
                             separators=(",", ":")
                         ).encode("utf-8")
-                        self.socket.send_multipart([
+                        self.pub.send_multipart([
                             topic.encode("ascii"), message
                         ])
+
+        if self.router in zmq_events:
+            req = self.router.recv_multipart(copy=False)
+            routing_id, sep, payload = (req + [None])[:3]  # noqa
+            payload = json.loads(payload.bytes)
+            answer = {
+                "executed": True,
+                "command": payload["command"]
+            }
+            self.router.send_multipart([
+                routing_id,
+                b"",
+                json.dumps(answer, separators=(",", ":")).encode()
+            ])
 
     def _send_periodic_messages(self):
         for timestamp in self.timestamps:
@@ -103,21 +146,23 @@ class TestPublisher:
                 payload,
                 separators=(",", ":")
             ).encode("utf-8")
-            self.socket.send_multipart([
+            self.pub.send_multipart([
                 topic.encode("ascii"),
                 payload
             ])
 
-    def publish(self):
+    def loop(self):
         while not self.event.is_set():
-            self._handle_subscription()
+            self._handle_events()
             self._send_periodic_messages()
             time.sleep(0.1)
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.event.set()
         self.t.join()
-        self.socket.close()
+        self.pub.close()
+        self.router.close()
+        self.auth.stop()
         self.context.term()
 
 
@@ -126,8 +171,20 @@ class TestDISCOSClient(unittest.TestCase):
     def test_no_topics(self):
         DISCOSClient(
             address="127.0.0.1",
-            port=DEFAULT_PORT,
+            sub_port=DEFAULT_SUB_PORT,
             telescope="SRT"
+        )
+
+    def test_unknown_telescope(self):
+        with self.assertRaises(ValueError) as ex:
+            DISCOSClient(
+                address="127.0.0.1",
+                sub_port=DEFAULT_SUB_PORT,
+                telescope="Unknown"
+            )
+        self.assertEqual(
+            "Unknown telescope: 'Unknown'",
+            ex.exception.args[0]
         )
 
     def test_unknown_topic(self):
@@ -135,7 +192,7 @@ class TestDISCOSClient(unittest.TestCase):
             DISCOSClient(
                 "foo",
                 address="127.0.0.1",
-                port=DEFAULT_PORT
+                sub_port=DEFAULT_SUB_PORT
             )
         self.assertTrue(
             "Topic 'foo' is not known" in ex.exception.args[0]
@@ -144,28 +201,37 @@ class TestDISCOSClient(unittest.TestCase):
             DISCOSClient(
                 "foo", "bar",
                 address="127.0.0.1",
-                port=DEFAULT_PORT,
+                sub_port=DEFAULT_SUB_PORT,
             )
         self.assertTrue(
             "Topics 'foo' and 'bar' are not known" in ex.exception.args[0]
         )
 
     def test_repr(self):
-        client = DISCOSClient(address="127.0.0.1", port=DEFAULT_PORT)
+        client = DISCOSClient(
+            address="127.0.0.1",
+            sub_port=DEFAULT_SUB_PORT
+        )
         self.assertTrue(
             repr(client).startswith("<DISCOSClient({") and
             repr(client).endswith("})>")
         )
 
     def test_str(self):
-        client = DISCOSClient(address="127.0.0.1", port=DEFAULT_PORT)
+        client = DISCOSClient(
+            address="127.0.0.1",
+            sub_port=DEFAULT_SUB_PORT
+        )
         self.assertTrue(
             str(client).startswith("{") and
             str(client).endswith("}")
         )
 
     def test_format(self):
-        client = DISCOSClient(address="127.0.0.1", port=DEFAULT_PORT)
+        client = DISCOSClient(
+            address="127.0.0.1",
+            sub_port=DEFAULT_SUB_PORT
+        )
         self.assertTrue(
             f"{client:}".startswith("{") and
             f"{client:}".endswith("}")
@@ -216,7 +282,10 @@ class TestDISCOSClient(unittest.TestCase):
 
     def test_bind(self):
         with TestPublisher("SRT"):
-            client = DISCOSClient(address="127.0.0.1", port=DEFAULT_PORT)
+            client = DISCOSClient(
+                address="127.0.0.1",
+                sub_port=DEFAULT_SUB_PORT
+            )
             s = set()
             called = set()
             s.add(id(client.antenna.timestamp.unix_time))
@@ -240,7 +309,10 @@ class TestDISCOSClient(unittest.TestCase):
 
     def test_wait(self):
         with TestPublisher():
-            client = DISCOSClient(address="127.0.0.1", port=DEFAULT_PORT)
+            client = DISCOSClient(
+                address="127.0.0.1",
+                sub_port=DEFAULT_SUB_PORT
+            )
             unix_time = client.antenna.timestamp.unix_time.copy()
             antenna = client.antenna.copy()
             self.assertNotEqual(
@@ -251,6 +323,71 @@ class TestDISCOSClient(unittest.TestCase):
                 antenna,
                 client.antenna.wait(timeout=5)
             )
+
+    @patch("discos_client.utils.load_certificate")
+    def test_command(self, mock_load_cert):
+        mock_load_cert.return_value = (dummy_public, dummy_secret)
+        with TestPublisher(router=True):
+            client = DISCOSClient(
+                address="127.0.0.1",
+                sub_port=DEFAULT_SUB_PORT,
+                req_port=DEFAULT_REQ_PORT,
+                telescope="SRT"
+            )
+            self.assertTrue(hasattr(client, "command"))
+            self.assertTrue(hasattr(client, "_online"))
+            while not client._online.is_set():
+                time.sleep(0.01)
+            answer = client.command("dummy")
+            self.assertTrue(answer["executed"])
+
+    @patch("discos_client.utils.load_certificate")
+    def test_command_with_args(self, mock_load_cert):
+        mock_load_cert.return_value = (dummy_public, dummy_secret)
+        with TestPublisher(router=True):
+            client = DISCOSClient(
+                address="127.0.0.1",
+                sub_port=DEFAULT_SUB_PORT,
+                req_port=DEFAULT_REQ_PORT,
+                telescope="SRT"
+            )
+            self.assertTrue(hasattr(client, "command"))
+            self.assertTrue(hasattr(client, "_online"))
+            while not client._online.is_set():
+                time.sleep(0.01)
+            answer = client.command("dummy", 1, 2, 3)
+            self.assertTrue(answer["executed"])
+
+    @patch("discos_client.utils.load_certificate")
+    def test_command_unreachable(self, mock_load_cert):
+        mock_load_cert.return_value = (dummy_public, dummy_secret)
+        with TestPublisher():
+            client = DISCOSClient(
+                address="127.0.0.1",
+                sub_port=DEFAULT_SUB_PORT,
+                req_port=DEFAULT_REQ_PORT,
+                telescope="SRT"
+            )
+            self.assertTrue(hasattr(client, "command"))
+            self.assertFalse(client.command("dummy")["executed"])
+
+    def test_command_not_present(self):
+        client = DISCOSClient(
+            address="127.0.0.1",
+            sub_port=DEFAULT_SUB_PORT
+        )
+        self.assertFalse(hasattr(client, "command"))
+
+    @patch("discos_client.utils.load_certificate")
+    def test_command_keys_not_present(self, mock_load_cert):
+        mock_load_cert.side_effect = OSError
+        client = DISCOSClient(
+            address="127.0.0.1",
+            sub_port=DEFAULT_SUB_PORT,
+            req_port=DEFAULT_REQ_PORT,
+            telescope="SRT"
+        )
+        self.assertFalse(hasattr(client, "command"))
 
 
 if __name__ == '__main__':
