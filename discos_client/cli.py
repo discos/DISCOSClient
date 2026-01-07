@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import os
 import sys
 from pathlib import Path
@@ -47,7 +46,7 @@ def print_discos_keys():
         "into consideration and you will hear back from the team."
     )
 
-if __name__ == "__main__":
+def main():
     parser = ArgumentParser(
         "DISCOS CURVE key pairs generator."
     )
@@ -65,5 +64,4 @@ if __name__ == "__main__":
 
     if not args.show_only:
         create_discos_keys(args.overwrite)
-
     print_discos_keys()

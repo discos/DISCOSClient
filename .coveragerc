@@ -1,6 +1,7 @@
 [run]
 concurrency = thread
 source = discos_client
+omit = discos_client/cli.py
 
 [paths]
 discos_client =

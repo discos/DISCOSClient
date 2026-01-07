@@ -21,11 +21,13 @@ dependencies = [
 
 [tool.setuptools]
 packages = ["discos_client"]
-script-files = ["scripts/discos-keygen"]
+
+[project.scripts]
+discos-keygen = "discos_client.cli:main"
 
 [tool.setuptools.package-data]
-"discos_client" = ["schemas/**", "servers/**"]
+discos_client = ["schemas/**", "servers/**"]
 
 [project.optional-dependencies]
-test = ["coverage", "prospector", "jsonschema", "referencing"]
+test = ["coverage", "prospector", "jsonschema", "referencing", "tornado"]
 docs = ["sphinx<9,>=6", "sphinx-rtd-theme", "sphinx-autodoc-typehints", "sphinx-jsonschema"]
