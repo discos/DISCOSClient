@@ -1,57 +1,64 @@
 import os
-import sys
 from pathlib import Path
 from argparse import ArgumentParser
 from platformdirs import user_config_dir
 from zmq.auth import create_certificates
 
-base_config = Path(user_config_dir("discos"))
-target_dir = base_config / "rpc" / "client"
-KEY_FILENAME = "identity"
-full_path_public = target_dir / f"{KEY_FILENAME}.key"
-full_path_secret = target_dir / f"{KEY_FILENAME}.key_secret"
+
+def get_config_paths():
+    base_config = Path(user_config_dir("discos"))
+    config_dir = base_config / "rpc" / "client"
+    public = config_dir / "identity.key"
+    secret = config_dir / "identity.key_secret"
+    return config_dir, public, secret
 
 
 def create_discos_keys(overwrite):
+    config_dir, public, secret = get_config_paths()
 
-    if full_path_secret.exists() and not overwrite:
+    if secret.exists() and not overwrite:
         print("Kept previously created key pair. "
               "Use --overwrite to replace it.\n")
-        return
+        return 0
 
     try:
-        target_dir.mkdir(parents=True, exist_ok=True)
+        config_dir.mkdir(parents=True, exist_ok=True)
     except OSError as e:
         print(f"Error creating the configuration directory: {e}")
-        sys.exit(1)
+        return 1
 
-    create_certificates(str(target_dir), KEY_FILENAME)
+    create_certificates(str(config_dir), "identity")
 
     if os.name == 'posix':
-        full_path_secret.chmod(0o600)
-        (target_dir / f"{KEY_FILENAME}.key").chmod(0o644)
-    print(f"Key pair created in: '{target_dir}'.")
+        public.chmod(0o644)
+        secret.chmod(0o600)
+    print(f"Key pair created in: '{config_dir}'.")
+    return 0
 
 
 def print_discos_keys():
-    if not full_path_public.exists():
-        print("No key was generated yet.")
-        return
+    _, public, _ = get_config_paths()
 
-    with open(full_path_public, "r", encoding="utf-8") as f:
+    if not public.exists():
+        print("No key was generated yet.")
+        return 0
+
+    with open(public, "r", encoding="utf-8") as f:
         print(f.read())
-    print(f"\nPath of the public key file: {full_path_public}")
-    print(f"Remember to never share the '{KEY_FILENAME}.key_secret' file with "
+
+    print(f"\nPath of the public key file: {public}")
+    print("Remember to never share the 'identity.key_secret' file with "
           "anyone.")
     print(
         "In order to be authorized to send command to any of the telescopes, "
-        f"remember to send a copy of the '{KEY_FILENAME}.key' file to the "
+        "remember to send a copy of the 'identity.key' file to the "
         "DISCOS team, asking for authorization. Your request will be taken "
         "into consideration and you will hear back from the team."
     )
+    return 0
 
 
-def main():
+def keygen():
     parser = ArgumentParser(
         "DISCOS CURVE key pairs generator."
     )
@@ -69,5 +76,9 @@ def main():
     args = parser.parse_args()
 
     if not args.show_only:
-        create_discos_keys(args.overwrite)
-    print_discos_keys()
+        return_code = create_discos_keys(args.overwrite)
+
+        if return_code != 0:
+            return return_code
+
+    return print_discos_keys()

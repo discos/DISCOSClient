@@ -23,7 +23,7 @@ dependencies = [
 packages = ["discos_client"]
 
 [project.scripts]
-discos-keygen = "discos_client.cli:main"
+discos-keygen = "discos_client.scripts:keygen"
 
 [tool.setuptools.package-data]
 discos_client = ["schemas/**", "servers/**"]
