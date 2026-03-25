@@ -73,3 +73,17 @@ To be authorized to send commands to any of the telescopes:
 #. Send a copy of the ``identity.key`` file to the **DISCOS team**,
    asking for authorization for the desired telescopes. Your request
    will be reviewed and you will hear back from the team.
+
+Server public key selection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To send commands, the client must know the public key of the RPC server.
+
+For telescope-specific clients, or when using ``DISCOSClient`` with the
+``telescope`` parameter, the default server public key bundled with the
+package is used.
+
+If needed, this default can be overridden by passing
+``server_public_key_file`` to :class:`~discos_client.client.DISCOSClient`.
+This is especially useful for development environments, local simulators,
+or custom deployments using a different server key.

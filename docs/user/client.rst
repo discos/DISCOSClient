@@ -91,3 +91,33 @@ When using the generic client, you **must** specify two key parameters:
    It will only load common schemas (like ``antenna``, ``weather``, ``scheduler``).
    Telescope-specific components such as ``active_surface``, ``minor_servo``, and
    ``mount`` **will not appear**, as their definition is station-specific.
+
+RPC server key override
+~~~~~~~~~~~~~~~~~~~~~~~
+
+When using :class:`~discos_client.client.DISCOSClient`, the ``telescope``
+parameter is still used to load the correct JSON schemas for telemetry
+decoding.
+
+If remote commands are enabled through the ``identity`` parameter, the client
+normally uses the default RPC server public key bundled for that telescope.
+This behavior can be overridden by passing ``server_public_key_file``, which
+forces the client to use the specified server public key file instead.
+
+This is useful when connecting to test environments, simulators, or custom
+DISCOS deployments whose RPC server key differs from the default production
+one.
+
+Example: connecting to a simulated DISCOS instance with a custom RPC key
+
+.. code-block:: python
+
+    from discos_client import DISCOSClient
+
+    client = DISCOSClient(
+        "active_surface",
+        address="192.168.56.200",
+        telescope="SRT",
+        identity="myclient",
+        server_public_key_file="/path/to/server.key",
+    )
