@@ -9,4 +9,3 @@ for testing and code quality checks.
    :maxdepth: 2
 
    contributing
-   inner_classes

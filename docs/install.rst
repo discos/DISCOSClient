@@ -19,21 +19,8 @@ To install it on **Linux**, **macOS** or **Windows**, , move into the
    cd DISCOSClient
    pip install .
 
-The last executed command will install the package along with its only required
-dependency: `pyzmq`.
-
-Verifying the installation
---------------------------
-
-After installation, you can verify that ZeroMQ and its Python bindings are correctly
-installed by performing this small test:
-
-.. code-block:: python
-
-   import zmq
-   print(zmq.zmq_version(), zmq.__version__)
-
-If you see version numbers printed without errors, you're ready to use DISCOSClient.
+The last executed command will install the package along with its required
+dependencies: `pyzmq` and `platformdirs`.
 
 .. note::
 
@@ -47,3 +34,17 @@ If you see version numbers printed without errors, you're ready to use DISCOSCli
 
       apk add zeromq-dev
       pip install .
+
+
+Verifying the installation
+--------------------------
+
+After installation, you can verify that ZeroMQ and its Python bindings are correctly
+installed by performing this small test:
+
+.. code-block:: python
+
+   import zmq
+   print(zmq.zmq_version(), zmq.__version__)
+
+If you see version numbers printed without errors, you're ready to use DISCOSClient.

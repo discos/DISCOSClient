@@ -21,7 +21,7 @@
     "correctionEnabled": {
       "type": "boolean",
       "title": "Pointing Corrections",
-      "description": "Indicates whether automatic pointing correction is enabled."
+      "description": "Indicates whether the pointing correction is applied."
     },
     "declinationOffset": {
       "type": "number",
@@ -192,6 +192,18 @@
           "description": "Y component of the Earth's polar motion (yp), in arcseconds.",
           "unit": "arcseconds"
         },
+        "gast": {
+          "type": "string",
+          "title": "Greenwich Apparent Sidereal Time",
+          "description": "Greenwich Apparent Sidereal Time formatted as HH:MM:SS.mmm.",
+          "format": "time"
+        },
+        "lst": {
+          "type": "string",
+          "title": "Local Apparent Sidereal Time",
+          "description": "Local Apparent Sidereal Time formatted as HH:MM:SS.mmm.",
+          "format": "time"
+        },
         "DUT1": {
           "type": "number",
           "title": "DUT1",
@@ -215,8 +227,10 @@
         "zPosition",
         "xPolarMotion",
         "yPolarMotion",
-        "ellipsoid",
-        "DUT1"
+        "gast",
+        "lst",
+        "DUT1",
+        "ellipsoid"
       ],
       "additionalProperties": false
     },
@@ -224,33 +238,129 @@
       "$ref": "../definitions/status.json"
     },
     "target": {
-      "type": "string",
-      "title": "Target ID",
-      "description": "Identifier or name of the current observed target."
-    },
-    "targetDeclination": {
-      "type": "string",
-      "title": "Target Declination",
-      "description": "Declination coordinate of the observed target.",
-      "unit": "dms"
-    },
-    "targetFlux": {
-      "type": "number",
-      "title": "Target Flux",
-      "description": "Flux density of the target.",
-      "unit": "Jansky"
-    },
-    "targetRightAscension": {
-      "type": "string",
-      "title": "Target Right Ascension",
-      "description": "Right ascension coordinate of the observed target.",
-      "unit": "hms"
-    },
-    "targetVrad": {
-      "type": "number",
-      "title": "Target Radial Velocity",
-      "description": "Radial velocity of the target.",
-      "unit": "km/s"
+      "type": "object",
+      "title": "Target Information",
+      "description": "Properties of the currently tracked target, including catalog data and generator-computed apparent coordinates.",
+      "properties": {
+        "apparentAzimuth": {
+          "type": "number",
+          "title": "Apparent Azimuth",
+          "description": "Apparent azimuth computed by the generator.",
+          "unit": "degrees"
+        },
+        "apparentDeclination": {
+          "type": "string",
+          "title": "Apparent Declination",
+          "description": "Apparent declination computed by the generator.",
+          "unit": "dms"
+        },
+        "apparentElevation": {
+          "type": "number",
+          "title": "Apparent Elevation",
+          "description": "Apparent elevation computed by the generator.",
+          "unit": "degrees"
+        },
+        "apparentGalLatitude": {
+          "type": "string",
+          "title": "Apparent Galactic Latitude",
+          "description": "Apparent galactic latitude computed by the generator.",
+          "unit": "dms"
+        },
+        "apparentGalLongitude": {
+          "type": "string",
+          "title": "Apparent Galactic Longitude",
+          "description": "Apparent galactic longitude computed by the generator.",
+          "unit": "dms"
+        },
+        "apparentRightAscension": {
+          "type": "string",
+          "title": "Apparent Right Ascension",
+          "description": "Apparent right ascension computed by the generator.",
+          "unit": "hms"
+        },
+        "catalogDeclination": {
+          "type": "string",
+          "title": "Catalog Declination",
+          "description": "J2000 catalog declination of the target.",
+          "unit": "dms"
+        },
+        "catalogRightAscension": {
+          "type": "string",
+          "title": "Catalog Right Ascension",
+          "description": "J2000 catalog right ascension of the target.",
+          "unit": "hms"
+        },
+        "flux": {
+          "type": "number",
+          "title": "Flux",
+          "description": "Flux density of the target.",
+          "unit": "Jansky"
+        },
+        "julianEpoch": {
+          "type": "number",
+          "title": "Julian Epoch",
+          "description": "Julian Epoch used for target calculations."
+        },
+        "name": {
+          "type": "string",
+          "title": "Target Name",
+          "description": "Identifier or name of the currently observed target."
+        },
+        "parallacticAngle": {
+          "type": "number",
+          "title": "Parallactic Angle",
+          "description": "Current parallactic angle.",
+          "unit": "degrees"
+        },
+        "radialVelocity": {
+          "type": "number",
+          "title": "Radial Velocity",
+          "description": "Radial velocity of the target.",
+          "unit": "km/s"
+        },
+        "radialVelocityDefinition": {
+          "type": "string",
+          "title": "Radial Velocity Definition",
+          "description": "Radial velocity definition of the target.",
+          "enum": [
+            "RADIO",
+            "OPTICAL",
+            "REDSHIFT",
+            "UNDEFINED"
+          ]
+        },
+        "radialVelocityFrame": {
+          "type": "string",
+          "title": "Radial Velocity Reference Frame",
+          "description": "Reference frame used for the target radial velocity measurements.",
+          "enum": [
+            "TOPOCENTRIC",
+            "BARYCENTRIC",
+            "KINEMATIC LOCAL STANDARD OF REST",
+            "DYNAMIC LOCAL STANDARD OF REST",
+            "GALACTIC CENTER",
+            "LOCAL GROUP",
+            "UNDEFINED"
+          ]
+        }
+      },
+      "required": [
+        "apparentAzimuth",
+        "apparentDeclination",
+        "apparentElevation",
+        "apparentGalLatitude",
+        "apparentGalLongitude",
+        "apparentRightAscension",
+        "catalogDeclination",
+        "catalogRightAscension",
+        "flux",
+        "julianEpoch",
+        "name",
+        "parallacticAngle",
+        "radialVelocity",
+        "radialVelocityDefinition",
+        "radialVelocityFrame"
+      ]
     },
     "timestamp": {
       "$ref": "../definitions/timestamp.json"
@@ -259,31 +369,6 @@
       "type": "boolean",
       "title": "Tracking Flag",
       "description": "Indicates whether the antenna is tracking the given coordinates."
-    },
-    "vradDefinition": {
-      "type": "string",
-      "title": "Target Radial Velocity Definition",
-      "description": "Radial velocity definition of the target.",
-      "enum": [
-        "RADIO",
-        "OPTICAL",
-        "REDSHIFT",
-        "UNDEFINED"
-      ]
-    },
-    "vradReferenceFrame": {
-      "type": "string",
-      "title": "Target Radial Velocity Reference Frame",
-      "description": "Reference frame used for the target radial velocity measurements.",
-      "enum": [
-        "TOPOCENTRIC",
-        "BARYCENTRIC",
-        "KINEMATIC LOCAL STANDARD OF REST",
-        "DYNAMIC LOCAL STANDARD OF REST",
-        "GALACTIC CENTER",
-        "LOCAL GROUP",
-        "UNDEFINED"
-      ]
     },
     "waveLength": {
       "type": "number",
@@ -316,14 +401,8 @@
     "site",
     "status",
     "target",
-    "targetDeclination",
-    "targetFlux",
-    "targetRightAscension",
-    "targetVrad",
     "timestamp",
     "tracking",
-    "vradDefinition",
-    "vradReferenceFrame",
     "waveLength"
   ],
   "additionalProperties": false

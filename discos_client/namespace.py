@@ -29,6 +29,9 @@ class DISCOSNamespace:
         "_observers",
         "_observers_lock",
         "_schema",
+        "_reactive",
+        "_node_name",
+        "get_value",
         "bind",
         "unbind",
         "wait",
@@ -36,7 +39,10 @@ class DISCOSNamespace:
     )
 
     def __init__(
-        self, schema: dict[str, Any] | None = None,
+        self,
+        schema: dict[str, Any] | None = None,
+        node_name: str | None = None,
+        reactive: bool = True,
         **kwargs: Any
     ) -> None:
         """
@@ -48,12 +54,22 @@ class DISCOSNamespace:
         Key "schema" represent the schema of the object tree, holding metadata.
 
         :param schema: The schema of the object tree.
+        :param reactive: Whether the object should expose the bind, copy,
+                         unbind and wait methods.
         :param kwargs: Arbitrary keyword arguments to initialize attributes.
         """
         object.__setattr__(self, "_lock", threading.RLock())
         object.__setattr__(self, "_observers", {})
         object.__setattr__(self, "_observers_lock", threading.Lock())
         object.__setattr__(self, "_schema", schema)
+        object.__setattr__(self, "_node_name", node_name)
+        object.__setattr__(self, "_reactive", reactive)
+
+        if reactive:
+            object.__setattr__(self, "bind", self.__bind__)
+            object.__setattr__(self, "copy", self.__copy__)
+            object.__setattr__(self, "unbind", self.__unbind__)
+            object.__setattr__(self, "wait", self.__wait__)
 
         meta: dict[str, Any] = {}
         if schema is not None:
@@ -65,13 +81,25 @@ class DISCOSNamespace:
         clean_kwargs: dict[str, Any] = {}
         for k, v in list(kwargs.items()):
             if k in ["items", "value"]:
-                clean_kwargs["_value"] = self._wrap_value(v, schema)
+                clean_kwargs["_value"] = self._wrap_value(
+                    v,
+                    schema,
+                    k,
+                    reactive
+                )
             else:
                 subschema = None
                 if not k.startswith("_"):
                     subschema = self._find_subschema(schema, k)
-                clean_kwargs[k] = self._wrap_value(v, subschema)
+                clean_kwargs[k] = self._wrap_value(
+                    v,
+                    subschema,
+                    k,
+                    reactive
+                )
         self.__dict__.update(clean_kwargs)
+        if self.__has_value__(self) and not self.__is__(self._value):
+            object.__setattr__(self, "get_value", self.__get_value__)
 
     @staticmethod
     def _find_subschema(
@@ -111,51 +139,59 @@ class DISCOSNamespace:
         return None
 
     @staticmethod
-    def _wrap_value(value: Any, schema: dict[str, Any] | None) -> Any:
+    def _wrap_value(
+        value: Any,
+        schema: dict[str, Any] | None,
+        node_name: str | None,
+        reactive: bool = True
+    ) -> Any:
         """
-        Transform dictionaries and lists to DISCOSNamespace objects.
+        Transforms dictionaries and lists to DISCOSNamespace objects.
 
         :param value: The value to be transformed to DISCOSNamespace if dict or
                       list.
         :param schema: The schema representing the object.
+        :param reactive: Whether the object should expose the bind, copy,
+                         unbind and wait methods.
         :return: The wrapped value if dict or list, value otherwise.
         """
         if isinstance(value, dict):
-            return DISCOSNamespace(schema=schema, **value)
+            return DISCOSNamespace(
+                schema=schema,
+                node_name=node_name,
+                reactive=reactive,
+                **value
+            )
         if isinstance(value, list):
             item_schema = None
             if schema is not None and schema.get("type") == "array":
                 item_schema = schema.get("items")
             return DISCOSNamespace(
                 schema=schema,
+                node_name=node_name,
+                reactive=reactive,
                 value=tuple(
-                    DISCOSNamespace(schema=item_schema, **v)
+                    DISCOSNamespace(
+                        schema=item_schema,
+                        node_name=node_name,
+                        reactive=reactive,
+                        **v
+                    )
                     if isinstance(v, dict) else v
                     for v in value
                 )
             )
         return value
 
-    def get_value(self) -> Any:
+    def __get_value__(self) -> Any:
         """
         Return the internal primitive value.
 
         :return: The internal value of the instance.
-        :raises AttributeError: If the object does not hold a primitive value.
         """
-        def raise_error():
-            raise AttributeError(
-                f"'{self.__typename__}' object has no attribute 'get_value'"
-            )
+        return self._value
 
-        if not self.__has_value__(self):
-            raise_error()
-        value = self._value
-        if DISCOSNamespace.__is__(value):
-            raise_error()
-        return value
-
-    def bind(
+    def __bind__(
         self,
         callback: Callable[[DISCOSNamespace], None],
         predicate: Callable[[DISCOSNamespace], bool] = None
@@ -175,7 +211,7 @@ class DISCOSNamespace:
                 else lambda _: True
             )
 
-    def unbind(
+    def __unbind__(
         self,
         callback: Callable[[DISCOSNamespace], None] | None = None,
         predicate: Callable[[DISCOSNamespace], bool] = None
@@ -200,7 +236,7 @@ class DISCOSNamespace:
             if predicate is None or not self._observers[callback]:
                 del self._observers[callback]
 
-    def wait(
+    def __wait__(
         self,
         predicate: Callable[[DISCOSNamespace], bool] = None,
         timeout: float | None = None
@@ -225,7 +261,7 @@ class DISCOSNamespace:
         with self._lock:
             return self
 
-    def copy(self) -> DISCOSNamespace:
+    def __copy__(self) -> DISCOSNamespace:
         """
         Return a copy of the DISCOSNamespace.
 
@@ -532,7 +568,11 @@ class DISCOSNamespace:
             node = self.__dict__.get(k)
             if node is None:
                 schema = DISCOSNamespace._find_subschema(self._schema, k)
-                node = DISCOSNamespace(schema=schema)
+                node = DISCOSNamespace(
+                    schema=schema,
+                    node_name=k,
+                    reactive=self._reactive
+                )
                 self.__dict__[k] = node
                 notify = True
             if DISCOSNamespace.__is__(node):
@@ -556,7 +596,7 @@ class DISCOSNamespace:
                 schema = schema.get("items", None)
             value = []
             for item in other:
-                d = DISCOSNamespace(schema=schema)
+                d = DISCOSNamespace(schema=schema, reactive=self._reactive)
                 d <<= item
                 value.append(d)
             self.__dict__["_value"] = sv = tuple(value)
@@ -584,54 +624,71 @@ class DISCOSNamespace:
             sdict["_value"] = other
         return True
 
+    # pylint: disable=too-many-branches
     def __format__(self, spec: str) -> str:
         """
         Custom format method.
 
         :param spec: Format specifier.
 
-            | 'c' - compact JSON
+            | 't' - tight JSON
             | '<n>i' - indented JSON \
 with optional indentation level <n> (default is 2)
-            | 'f' - full representation with metadata
+            | 'e' - entire representation with metadata
             | 'm' - metadata only representation
+            | 'w' - wrap the representation in a container prepending the \
+node key
 
         :return: A JSON formatted string for non-leaf nodes. If self is a leaf
                  node, it delegates to `format(self._value, spec)`.
         :raise ValueError: If the format specifier is unknown or malformed.
         """
-        if self.__has_value__(self) and not isinstance(self._value, tuple):
-            with self._lock:
-                return format(self._value, spec)
+        reserved = set("tiemw")
+        is_container = any(c in spec for c in reserved)
 
-        has_f = "f" in spec
+        if self.__has_value__(self) and not \
+                isinstance(self._value, (tuple, list)):
+            if not is_container:
+                with self._lock:
+                    return format(self._value, spec)
+
+        has_e = "e" in spec
         has_m = "m" in spec
+        has_w = "w" in spec
 
-        if has_f and has_m:
+        if has_e and has_m:
             raise ValueError(
-                "Format specifier cannot contain both 'f' and 'm'."
+                "Format specifier cannot contain both 'e' and 'm'."
             )
 
-        if has_f:
-            fmt_spec = spec[1:] if spec.startswith("f") else spec
-            fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("f") else fmt_spec
+        if has_e:
+            fmt_spec = spec[1:] if spec.startswith("e") else spec
+            fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("e") else fmt_spec
         elif has_m:
             fmt_spec = spec[1:] if spec.startswith("m") else spec
             fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("m") else fmt_spec
         else:
             fmt_spec = spec
 
+        data_to_serialize = self
+        if has_w:
+            if self._node_name is None:
+                raise ValueError("Cannot wrap node without a key!")
+            data_to_serialize = {self._node_name: self}
+            fmt_spec = spec[1:] if spec.startswith("w") else spec
+            fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("w") else fmt_spec
+
         indent = None
         separators = None
         default = (
-            self.__full_dict__ if has_f
+            self.__full_dict__ if has_e
             else self.__metadata_dict__ if has_m
             else self.__message_dict__
         )
 
         if fmt_spec == "":
             pass
-        elif fmt_spec == "c":
+        elif fmt_spec == "t":
             separators = (",", ":")
         elif fmt_spec.endswith("i"):
             fmt_par = fmt_spec[:-1]
@@ -652,7 +709,7 @@ with optional indentation level <n> (default is 2)
 
         with self._lock:
             return json.dumps(
-                self,
+                data_to_serialize,
                 default=default,
                 indent=indent,
                 separators=separators,
@@ -671,10 +728,10 @@ with optional indentation level <n> (default is 2)
             cls = self.__class__
             public = cls.__full_dict__(self)
             copied = deepcopy(public, memo)
-            return cls(**copied)
+            return cls(reactive=self._reactive, **copied)
 
     @classmethod
-    def __get_value__(cls, obj: DISCOSNamespace) -> Any:
+    def __retrieve_value__(cls, obj: DISCOSNamespace) -> Any:
         """
         Retrieve the internal stored value of a given DISCOSNamespace instance.
 
@@ -721,7 +778,7 @@ with optional indentation level <n> (default is 2)
         return public_dict(
             obj,
             cls.__is__,
-            cls.__get_value__
+            cls.__retrieve_value__
         )
 
     @classmethod
@@ -736,7 +793,7 @@ with optional indentation level <n> (default is 2)
         def unwrap(value: Any) -> Any:
             if cls.__is__(value):
                 if cls.__has_value__(value):
-                    return unwrap(cls.__get_value__(value))
+                    return unwrap(cls.__retrieve_value__(value))
                 retval = {}
                 for k, v in vars(value).items():
                     if k in cls.__private__ or k in META_KEYS:
@@ -764,7 +821,7 @@ with optional indentation level <n> (default is 2)
             if isinstance(value, (list, tuple)):
                 return [strip(v) for v in value]
             return value
-        return strip(public_dict(obj, cls.__is__, cls.__get_value__))
+        return strip(public_dict(obj, cls.__is__, cls.__retrieve_value__))
 
     @classmethod
     def __value_repr__(cls, obj: Any) -> Any:
@@ -776,12 +833,12 @@ with optional indentation level <n> (default is 2)
         """
         if cls.__is__(obj):
             if cls.__has_value__(obj):
-                val = cls.__get_value__(obj)
+                val = cls.__retrieve_value__(obj)
                 return cls.__value_repr__(val)
             return {
                 k: cls.__value_repr__(v)
                 for k, v in vars(obj).items()
-                if not k.startswith("_")
+                if not k.startswith("_") and k not in cls.__private__
             }
         if isinstance(obj, (tuple, list)):
             return [cls.__value_repr__(v) for v in obj]
@@ -815,7 +872,7 @@ with optional indentation level <n> (default is 2)
         :raises AttributeError: If the attribute is not present.
         """
         with self._lock:
-            if self.__has_value__(self):
+            if name not in self.__private__ and self.__has_value__(self):
                 value = self._value
                 if hasattr(value, name):
                     return getattr(value, name)
@@ -836,11 +893,7 @@ with optional indentation level <n> (default is 2)
         :return: Sorted list of attribute names.
         """
         attrs = set(super().__dir__())
-        if not self.__has_value__(self):
-            attrs.discard("get_value")
-        else:
+        if self.__has_value__(self):
             value = self._value
-            if DISCOSNamespace.__is__(value):
-                attrs.discard("get_value")
             attrs = set(dir(value)).union(attrs)
         return sorted(attrs)

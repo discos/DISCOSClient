@@ -16,14 +16,18 @@ classifiers = [
 ]
 dependencies = [
     "pyzmq",
+    "platformdirs"
 ]
 
 [tool.setuptools]
 packages = ["discos_client"]
 
+[project.scripts]
+discos-keygen = "discos_client.scripts:keygen"
+
 [tool.setuptools.package-data]
-"discos_client" = ["schemas/**"]
+discos_client = ["schemas/**", "servers/**"]
 
 [project.optional-dependencies]
 test = ["coverage", "prospector", "jsonschema", "referencing"]
-docs = ["sphinx", "sphinx-rtd-theme", "sphinx-autodoc-typehints", "sphinx-jsonschema"]
+docs = ["sphinx<9,>=6", "sphinx-rtd-theme", "sphinx-autodoc-typehints", "sphinx-jsonschema"]

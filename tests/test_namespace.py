@@ -182,7 +182,7 @@ class TestDISCOSNamespace(unittest.TestCase):
             "Unknown format code '.3f' for DISCOSNamespace"
         )
         self.assertEqual(
-            f"{ns:c}",
+            f"{ns:t}",
             json.dumps({"a": a}, separators=(",", ":"))
         )
         with self.assertRaises(ValueError) as ex:
@@ -192,17 +192,17 @@ class TestDISCOSNamespace(unittest.TestCase):
             "Unknown format code '3c' for DISCOSNamespace"
         )
         with self.assertRaises(ValueError) as ex:
-            _ = f"{ns:fm}"
+            _ = f"{ns:em}"
         self.assertEqual(
             str(ex.exception),
-            "Format specifier cannot contain both 'f' and 'm'."
+            "Format specifier cannot contain both 'e' and 'm'."
         )
         self.assertEqual(
             f"{ns:i}",
             json.dumps({"a": a}, indent=2)
         )
         self.assertEqual(
-            f"{ns:f}",
+            f"{ns:e}",
             json.dumps(b)
         )
         b_ = deepcopy(b)
@@ -217,7 +217,7 @@ class TestDISCOSNamespace(unittest.TestCase):
                 json.dumps({"a": a}, indent=indent)
             )
             self.assertEqual(
-                f"{ns:f{indent}i}",
+                f"{ns:e{indent}i}",
                 json.dumps(b, indent=indent)
             )
         with self.assertRaises(ValueError) as ex:
@@ -241,6 +241,14 @@ class TestDISCOSNamespace(unittest.TestCase):
                 ns = DISCOSNamespace(**d)
                 self.assertEqual(f"{ns}", json.dumps(d))
                 _ = f"{ns:f}"
+
+        ns = DISCOSNamespace(node_name="a", **{"b": 1.234})
+        self.assertEqual(f"{ns:w}", '{"a": {"b": 1.234}}')
+
+        ns = DISCOSNamespace(**{"b": 1.234})
+        with self.assertRaises(ValueError) as ex:
+            _ = f"{ns:w}"
+        self.assertEqual(str(ex.exception), "Cannot wrap node without a key!")
 
     def test_op(self):
         a = 2

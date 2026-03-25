@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "definitions/command_answer.json",
+  "title": "Command Answer",
+  "description": "Schema representing an answer from DISCOS following a command.",
+  "node": "command_answer",
+  "type": "object",
+  "properties": {
+    "answer": {
+      "type": "array",
+      "title": "Command Answer",
+      "description": "Return values of the issued command.",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          { "type": "number" },
+          { "type": "boolean" }
+        ]
+      }
+    },
+    "command": {
+      "type": "string",
+      "title": "Command Name",
+      "description": "Name of the issued command."
+    },
+    "error_trace": {
+      "type": "array",
+      "title": "Error Trace",
+      "description": "List of errors occurred during the execution of the issued command.",
+      "items": {
+        "type": "object",
+        "title": "Error Detail",
+        "description": "Detailed information about a single error in the stack.",
+        "properties": {
+          "code": {
+            "type": "number",
+            "title": "Error Code",
+            "description": "Code of the returned error."
+          },
+          "category": {
+            "type": "number",
+            "title": "Error Category",
+            "description": "Category of the returned error."
+          },
+          "message": {
+            "type": "string",
+            "title": "Error Message",
+            "description": "Text description of the returned error."
+          }
+        },
+        "required": ["code", "category", "message"],
+        "additionalProperties": false
+      }
+    },
+    "executed": {
+      "type": "boolean",
+      "title": "Command Executed",
+      "description": "Boolean indicating whether the command was executed or not."
+    },
+    "timestamp": {
+      "$ref": "../definitions/timestamp.json"
+    }
+  },
+  "required": ["command", "executed", "timestamp"],
+  "additionalProperties": false
+}

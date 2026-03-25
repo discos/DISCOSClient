@@ -1,98 +1,5 @@
-User Guide
-==========
-
-This guide shows how to use :class:`~discos_client.client.DISCOSClient` to
-read real-time telemetry data from INAF's single-dish radio telescopes.
-The client provides an interface with structured data exposed as nested
-Python objects.
-
-Instantiating a Client
-----------------------
-
-The :class:`~discos_client.client.DISCOSClient` can be instantiated for
-different telescopes using predefined functions named after the supported
-observatories.
-
-These helper functions automatically configure the network settings
-and telescope name for you, so you won't have to provide an IP address and
-port. You will only need to specify the topics you want to subscribe to.
-If no topics are specified, the client will automatically subscribe
-to all available ones for the selected telescope.
-
-.. |topics| replace:: One or more topic names to subscribe to.
-.. |rettype| replace:: :class:`~discos_client.client.DISCOSClient`
-.. |return| replace:: An instance of :class:`~discos_client.client.DISCOSClient`
-
-SRTClient
-.........
-
-.. function:: SRTClient(*topics: str)
-
-   Creates a client configured for the **Sardinia Radio Telescope (SRT)**.
-
-   :param topics: |topics|
-   :type topics: str
-   :return: |return|
-   :return type: |rettype|
-
-MedicinaClient
-..............
-
-.. function:: MedicinaClient(*topics: str)
-
-   Creates a client configured for the **Medicina Radio Telescope**.
-
-   :param topics: |topics|
-   :type topics: str
-   :return: |return|
-   :return type: |rettype|
-
-NotoClient
-..........
-
-.. function:: NotoClient(*topics: str)
-
-   Creates a client configured for the **Noto Radio Telescope**.
-
-   :param topics: |topics|
-   :type topics: str
-   :return: |return|
-   :return type: |rettype|
-
-Generic DISCOSClient
-....................
-If you are working with a DISCOS environment different from the three telescope
-production lines, you might want to create an instance of a
-:class:`~discos_client.client.DISCOSClient` with a custom pair of IP address
-and port. In this case you will also need to specify the telescope line the
-DISCOS instance you are pointing to is simulating, so that all the corresponding
-schemas are correctly accessible.
-
-To create a client for the **Sardinia Radio Telescope**:
-
-.. code-block:: python
-
-   from discos_client import SRTClient
-
-   SRT = SRTClient("mount", "antenna")
-
-To create a client for the **Medicina Radio Telescope** and subscribe to all its available topics:
-
-.. code-block:: python
-
-   MED = MedicinaClient()
-
-To create a client which points to a custom instance of DISCOS, simulating the
-**Noto Radio Telescope**:
-
-.. code-block:: python
-
-   from discos_client import DISCOSClient
-
-   NOTO = DISCOSClient(address="192.168.56.200", port=16000, telescope="Noto")
-
-Direct access to values
------------------------
+Accessing telemetry data
+========================
 
 Clients maintain an internal view of the most recent values for each
 subscribed topic. You can access these data directly, at any time,
@@ -112,6 +19,39 @@ lists). The entire tree updates in place as new messages are received.
 Since the whole tree is constantly updated, we provide several ways of
 accessing members, to cover different scenarios.
 
+Accessing the value of a leaf :class:`~discos_client.namespace.DISCOSNamespace` object
+--------------------------------------------------------------------------------------
+
+The method shown above provides access to a
+:class:`~discos_client.namespace.DISCOSNamespace` node of the status tree.
+
+
+
+
+This class acts as a wrapper for the inner value, allowing it to be part of comparisons
+and operations just like you were working with a pure string, integer, floating point
+number or boolean value. In case you are accessing a leaf node of the tree, you may want
+to access the internal value directly instead of using this wrapper functionality.
+In order to retrieve the internal value, the
+:class:`~discos_client.namespace.DISCOSNamespace` class offers a method called
+:meth:`~discos_client.namespace.DISCOSNamespace.get_value`.
+
+.. code-block:: python
+
+   projectCode = SRT.scheduler.projectCode
+   # projectCode is a DISCOSNamespace object
+   projectCode = SRT.scheduler.projectCode.get_value()
+   # projectCode is now a pure str object
+
+Most of the times you won't need to access inner values, but for more complex
+operations, sometimes your Python distribution might raise some exceptions when
+using a :class:`~discos_client.namespace.DISCOSNamespace` object
+as indexer for a list or a dictionary. In case you bump into some weird behavior,
+try using :meth:`~discos_client.namespace.DISCOSNamespace.get_value`. You will
+also benefit in case you need to work with a fixed value and avoid the continuous
+updating of a :class:`~discos_client.namespace.DISCOSNamespace` node.
+
+
 Immutable snapshots with :meth:`~discos_client.namespace.DISCOSNamespace.copy`
 ------------------------------------------------------------------------------
 
@@ -130,9 +70,10 @@ with the :meth:`~discos_client.namespace.DISCOSNamespace.copy` method.
 Waiting for updates with :meth:`~discos_client.namespace.DISCOSNamespace.wait`
 ------------------------------------------------------------------------------
 
-Sometimes you only need to check the value of a property only for changes, for
-example to check if the antenna was stowed due to high winds. The
-:meth:`~discos_client.namespace.DISCOSNamespace.wait` method comes to your help.
+Sometimes you only need to check the value of a property for changes, for
+example, when a new subscan is being performed, or to check if the antenna was
+stowed due to high winds. The :meth:`~discos_client.namespace.DISCOSNamespace.wait`
+method comes to your help.
 
 .. code-block:: python
 
@@ -168,9 +109,9 @@ changes.
    ...
    True
 
-The example above will call ``printValue`` and print the value of
-scheduler.tracking as soon as it changes. The three dots ... represent some
-other code that the application will continue to execute in the main thread.
+The example above will call the simple ``printValue`` function, which will print
+the value of scheduler.tracking as soon as it changes. The three dots ... represent
+some other code that the application will continue to execute in the main thread.
 
 A callback registered with :meth:`~discos_client.namespace.DISCOSNamespace.bind`
 might not be needed anymore at some point in time. The
@@ -212,7 +153,10 @@ method.
    # send an alarm to someone that is waiting for the antenna to be stowed
 
 The same principle can be applied to the
-:meth:`~discos_client.namespace.DISCOSNamespace.bind` method.
+:meth:`~discos_client.namespace.DISCOSNamespace.bind` method. The following
+example shows how to bind a callback that would send an alarm via e-mail
+whenever the temperature of the cool head of the SRTKBandMFReceiver is greater
+or equal to 30K.
 
 .. code-block:: python
 
@@ -259,35 +203,10 @@ the callback a one-time called function.
 
 In the last example, the ``sendAlarm`` callback is called once as soon as the
 newly received value for cryoTemperatureCoolHead of the SRTKBandMFReceiver is
-greater or equal to 30. As soon as the alarm logic is executed, the callback
+greater or equal to 30K. As soon as the alarm logic is executed, the callback
 can be unregistered, preventing the application to send another unwanted alarm.
-
-Accessing the inner value of a :class:`~discos_client.namespace.DISCOSNamespace` object
----------------------------------------------------------------------------------------
-Methods shown above always provide access to a
-:class:`~discos_client.namespace.DISCOSNamespace` node of the status tree. This class
-acts as a wrapper for the inner value, allowing it to be part of comparisons and
-operations just like you were working with a pure string, integer, floating point
-number or boolean value. Sometimes you would want to get rid of the
-:class:`~discos_client.namespace.DISCOSNamespace` wrapper and work with the inner
-value. In order to retrieve it the
-:class:`~discos_client.namespace.DISCOSNamespace` class offers a method called
-:meth:`~discos_client.namespace.DISCOSNamespace.get_value`.
-
-.. code-block:: python
-
-   projectCode = SRT.scheduler.projectCode
-   # projectCode is a DISCOSNamespace object
-   projectCode = SRT.scheduler.projectCode.get_value()
-   # projectCode is now a pure str object
-
-Most of the times you won't need to access inner value, but for more complex
-operations, sometimes your Python distribution might raise some exceptions when
-using a :class:`~discos_client.namespace.DISCOSNamespace` object
-as indexer for a list or a dictionary. In case you bump into some weird behavior,
-try using :meth:`~discos_client.namespace.DISCOSNamespace.get_value`. You will
-also benefit in case you need to work with a fixed value and avoid the continuous
-updating of a :class:`~discos_client.namespace.DISCOSNamespace` node.
+The callback must be registered again later if you would like to receive
+another alarm if the temperature rises again.
 
 Tips and best practices
 -----------------------
@@ -297,5 +216,5 @@ Tips and best practices
   processing so that the value stays the same
 * Always unregister callbacks you no longer need with
   :meth:`~discos_client.namespace.DISCOSNamespace.unbind` so that code is not
-  executed when is no longer needed
+  executed again and again
 * Refer to the :class:`~discos_client.namespace.DISCOSNamespace` class for more details.

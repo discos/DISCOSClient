@@ -1,13 +1,14 @@
 .. _schemas:
 
-Messages JSON Schemas
-=====================
+Telemetry data schemas
+======================
 
-The following sections contain the message schemas, describing the properties
-each schema includes, along with their title, unit of measure, and description.
-Some messages are sent by DISCOS components common to all three telescopes,
-while others are station-specific. Although certain messages may be delivered
-on the same topics, their structure might differ depending on the station.
+The following sections contain the telemetry message schemas, describing the
+properties each schema includes, along with their title, unit of measure, and
+description. Some messages are sent by DISCOS components common to all three
+telescopes, while others are station-specific. Although certain messages may
+be delivered on the same topics, their structure might differ depending on the
+station.
 
 .. jsonschema:: example.json
    :auto_reference: true
@@ -16,7 +17,7 @@ on the same topics, their structure might differ depending on the station.
 More details regarding each schema can be found in the following sections.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    definitions
    active_surface
