@@ -16,6 +16,7 @@ from discos_client.client import DISCOSClient, \
 
 
 if sys.platform == "win32":
+    # pylint: disable=deprecated-class
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 keys_path = Path(__file__).resolve().parent / "test_keys"
@@ -414,6 +415,59 @@ class TestDISCOSClient(unittest.TestCase):
             self.assertTrue(hasattr(client, "command"))
             answer = client.command("disconnect")
             self.assertFalse(answer.executed)
+
+    @patch("discos_client.utils.load_certificate")
+    def test_command_with_server_public_key_file(self, mock_load_cert):
+        mock_load_cert.return_value = (dummy_public, dummy_secret)
+        with TestPublisher(router=True):
+            client = DISCOSClient(
+                address="127.0.0.1",
+                sub_port=DEFAULT_SUB_PORT,
+                req_port=DEFAULT_REQ_PORT,
+                identity="identity",
+                server_public_key_file="/tmp/server.key",
+            )
+            self.assertTrue(hasattr(client, "command"))
+            answer = client.command("dummy")
+            self.assertTrue(answer.executed)
+
+    @patch("discos_client.utils.load_certificate")
+    def test_command_with_telescope_and_server_public_key_file(
+        self,
+        mock_load_cert
+    ):
+        mock_load_cert.return_value = (dummy_public, dummy_secret)
+        with self.assertRaises(ValueError) as ex:
+            DISCOSClient(
+                address="127.0.0.1",
+                sub_port=DEFAULT_SUB_PORT,
+                req_port=DEFAULT_REQ_PORT,
+                telescope="SRT",
+                identity="identity",
+                server_public_key_file="/tmp/server.key",
+            )
+        self.assertIn(
+            "Use either 'telescope' or 'server_public_key_file', not both.",
+            str(ex.exception)
+        )
+
+    @patch("discos_client.utils.load_certificate")
+    def test_command_without_telescope_or_server_public_key_file(
+        self,
+        mock_load_cert
+    ):
+        mock_load_cert.return_value = (dummy_public, dummy_secret)
+        with self.assertRaises(ValueError) as ex:
+            DISCOSClient(
+                address="127.0.0.1",
+                sub_port=DEFAULT_SUB_PORT,
+                req_port=DEFAULT_REQ_PORT,
+                identity="identity",
+            )
+        self.assertIn(
+            "Either 'telescope' or 'server_public_key_file' must be provided",
+            str(ex.exception)
+        )
 
 
 class TestTelescopeClients(unittest.TestCase):

@@ -4,6 +4,7 @@ import weakref
 from threading import Thread, Lock, Event
 from collections import defaultdict
 from typing import Any
+from pathlib import Path
 import zmq
 from zmq.utils.monitor import recv_monitor_message
 from .namespace import DISCOSNamespace
@@ -31,7 +32,8 @@ class DISCOSClient:
         sub_port: int = DEFAULT_SUB_PORT,
         req_port: int = DEFAULT_REQ_PORT,
         telescope: str | None = None,
-        identity: str | None = None
+        identity: str | None = None,
+        server_public_key_file: str | Path | None = None,
     ) -> None:
         """
         :param topics: topic names to subscribe to.
@@ -42,6 +44,10 @@ class DISCOSClient:
         :param identity: name of the key file to be used for sending remote
                          commands. Ideally, each application should have and
                          use its own identity.
+        :param server_public_key_file: path to a ZMQ public certificate file
+                                       containing the RPC server public key.
+                                       Useful when using plain DISCOSClient
+                                       without a predefined telescope profile.
         :raises ValueError: If one or more given topics are not known.
         :raises FileNotFoundError: If the provided identity file is missing.
         :raises ValueError: If the the provided identity file does not contain
@@ -90,12 +96,17 @@ class DISCOSClient:
             self._context
         )
 
-        if telescope and identity:
+        if identity is not None:
             try:
-                public, secret, server = get_auth_keys(telescope, identity)
+                public, secret, server = get_auth_keys(
+                    identity=identity,
+                    telescope=telescope,
+                    server_public_key_file=server_public_key_file,
+                )
             except OSError as ex:
                 raise ValueError(
-                    f"Unknown or invalid identity '{identity}'."
+                    f"Unknown or invalid identity '{identity}', "
+                    "or invalid server public key."
                 ) from ex
             self._client_public = public
             self._client_secret = secret

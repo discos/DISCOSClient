@@ -158,30 +158,105 @@ def __unwrap(value: Any, is_fn, get_value_fn) -> Any:
     return list(value) if isinstance(value, (list, tuple)) else value
 
 
-def get_auth_keys(
-    telescope: str,
-    identity: str
-) -> tuple[bytes]:
-    """Retrieves the CURVE authentication keys, both for the client and
-    the desired server.
+def get_client_auth_keys(identity: str) -> tuple[bytes, bytes]:
+    """Retrieve the CURVE client key pair associated with a given identity.
 
-    :param telescope: The telescope for which the server public key will be
-                      retrieved.
-    :param identity: The name of the key pair file to be used.
-    :return: The client's public and secret keys, followed by the server's
-             public key, as a tuple.
+    The key pair is loaded from the user's configuration directory,
+    typically located at:
+        ``~/.config/discos/rpc/client/<identity>.key_secret``
+
+    :param identity: The name of the client identity (key file prefix).
+    :return: A tuple containing the client public and secret keys.
+    :raises OSError: If the key file cannot be found or loaded.
     """
     config_base = Path(user_config_dir("discos"))
     curve_directory = config_base / "rpc" / "client"
     client_pair = curve_directory / f"{identity}.key_secret"
-    server_pair = files("discos_client") / "servers" \
-        / telescope.lower() / "server.key"
     client_public, client_secret = load_certificate(client_pair)
-    server_public, _ = load_certificate(server_pair)
+    return client_public, client_secret
+
+
+def get_server_public_key(
+    telescope: str | None = None,
+    server_public_key_file: str | Path | None = None,
+) -> bytes:
+    """Retrieve the CURVE public key of a DISCOS RPC server.
+
+    The server public key can be obtained either from a predefined
+    telescope configuration or from an explicit key file.
+
+    Exactly one of the following must be provided:
+      - ``telescope``: loads the key from the package resources
+        (``discos_client/servers/<telescope>/server.key``)
+      - ``server_public_key_file``: loads the key from a user-specified path
+
+    :param telescope: The telescope name used to locate a bundled server key.
+    :param server_public_key_file: Path to a server public key file.
+    :return: The server public key.
+    :raises ValueError: If both or neither arguments are provided.
+    :raises OSError: If the key file cannot be found or loaded.
+    """
+    if telescope is not None and server_public_key_file is not None:
+        raise ValueError(
+            "Use either 'telescope' or 'server_public_key_file', not both."
+        )
+
+    if server_public_key_file is not None:
+        server_public, _ = load_certificate(Path(server_public_key_file))
+        return server_public
+
+    if telescope is not None:
+        server_pair = files("discos_client") / "servers" \
+            / telescope.lower() / "server.key"
+        server_public, _ = load_certificate(server_pair)
+        return server_public
+
+    raise ValueError(
+        "Either 'telescope' or 'server_public_key_file' must be provided "
+        "to enable RPC."
+    )
+
+
+def get_auth_keys(
+    identity: str,
+    telescope: str | None = None,
+    server_public_key_file: str | Path | None = None
+) -> tuple[bytes, bytes, bytes]:
+    """Retrieve CURVE authentication keys for both client and server.
+
+    This function loads:
+      - the client key pair associated with the given ``identity``
+      - the server public key, either from a telescope profile or an
+        explicit file
+
+    The server key selection follows these rules:
+      - if ``server_public_key_file`` is provided, it is used
+      - otherwise, ``telescope`` must be provided to load a bundled key
+
+    :param identity: The name of the client identity (key file prefix).
+    :param telescope: The telescope name used to locate a bundled server key.
+    :param server_public_key_file: Path to a server public key file.
+    :return: A tuple containing (client_public, client_secret, server_public).
+    :raises ValueError: If neither or both server key sources are provided.
+    :raises OSError: If any key file cannot be found or loaded.
+    """
+    client_public, client_secret = get_client_auth_keys(identity)
+    server_public = get_server_public_key(telescope, server_public_key_file)
     return client_public, client_secret, server_public
 
 
 def timestamp() -> dict[str, Any]:
+    """Return the current timestamp in multiple standard formats.
+
+    The returned dictionary contains:
+      - ``unix_time``: seconds since the Unix epoch (float)
+      - ``omg_time``: time in 100-nanosecond intervals since
+        1582-10-15 (UUID/OMG timestamp format)
+      - ``mjd``: Modified Julian Date (days since 1858-11-17)
+      - ``iso8601``: UTC time in ISO 8601 format with millisecond precision
+
+    :return: A dictionary containing the current time in multiple formats.
+    """
     now = time.time()
     iso8601 = datetime.fromtimestamp(now, tz=timezone.utc)
     iso8601 = iso8601.isoformat(timespec="milliseconds").replace("+00:00", "Z")
