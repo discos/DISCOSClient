@@ -11,6 +11,7 @@ import zmq
 from zmq.auth import load_certificate
 from zmq.auth.thread import ThreadAuthenticator
 from discos_client.client import DISCOSClient, \
+    SRTClient, MedicinaClient, NotoClient, \
     DEFAULT_SUB_PORT, DEFAULT_REQ_PORT
 
 
@@ -131,15 +132,20 @@ class TestPublisher:
             req = self.router.recv_multipart(copy=False)
             routing_id, sep, payload = (req + [None])[:3]  # noqa
             payload = json.loads(payload.bytes)
-            answer = {
-                "executed": True,
-                "command": payload["command"]
-            }
-            self.router.send_multipart([
-                routing_id,
-                b"",
-                json.dumps(answer, separators=(",", ":")).encode()
-            ])
+            command = payload["command"]
+            if command == "disconnect":
+                # We are testing how the client handles server disconnection
+                self.router.close()
+            else:
+                answer = {
+                    "executed": True,
+                    "command": payload["command"]
+                }
+                self.router.send_multipart([
+                    routing_id,
+                    b"",
+                    json.dumps(answer, separators=(",", ":")).encode()
+                ])
 
     def _send_periodic_messages(self):
         for timestamp in self.timestamps:
@@ -249,10 +255,10 @@ class TestDISCOSClient(unittest.TestCase):
             "Unknown format code 'u' for DISCOSClient"
         )
         with self.assertRaises(ValueError) as ex:
-            _ = f"{client:.3f}"
+            _ = f"{client:.3e}"
         self.assertEqual(
             str(ex.exception),
-            "Unknown format code '.3f' for DISCOSClient"
+            "Unknown format code '.3e' for DISCOSClient"
         )
         with self.assertRaises(ValueError) as ex:
             _ = f"{client:.3m}"
@@ -261,10 +267,10 @@ class TestDISCOSClient(unittest.TestCase):
             "Unknown format code '.3m' for DISCOSClient"
         )
         with self.assertRaises(ValueError) as ex:
-            _ = f"{client:fm}"
+            _ = f"{client:em}"
         self.assertEqual(
             str(ex.exception),
-            "Format specifier cannot contain both 'f' and 'm'."
+            "Format specifier cannot contain both 'e' and 'm'."
         )
         with self.assertRaises(ValueError) as ex:
             _ = f"{client:0i}"
@@ -284,7 +290,7 @@ class TestDISCOSClient(unittest.TestCase):
             str(ex.exception),
             "Unknown format code '3c' for DISCOSClient"
         )
-        self.assertNotIn("\": ", f"{client:c}")
+        self.assertNotIn("\": ", f"{client:t}")
 
     def test_bind(self):
         with TestPublisher("SRT"):
@@ -338,14 +344,12 @@ class TestDISCOSClient(unittest.TestCase):
                 address="127.0.0.1",
                 sub_port=DEFAULT_SUB_PORT,
                 req_port=DEFAULT_REQ_PORT,
-                telescope="SRT"
+                telescope="SRT",
+                identity="identity"
             )
             self.assertTrue(hasattr(client, "command"))
-            self.assertTrue(hasattr(client, "_online"))
-            while not client._online.is_set():
-                time.sleep(0.01)
             answer = client.command("dummy")
-            self.assertTrue(answer["executed"])
+            self.assertTrue(answer.executed)
 
     @patch("discos_client.utils.load_certificate")
     def test_command_with_args(self, mock_load_cert):
@@ -355,14 +359,12 @@ class TestDISCOSClient(unittest.TestCase):
                 address="127.0.0.1",
                 sub_port=DEFAULT_SUB_PORT,
                 req_port=DEFAULT_REQ_PORT,
-                telescope="SRT"
+                telescope="SRT",
+                identity="identity"
             )
             self.assertTrue(hasattr(client, "command"))
-            self.assertTrue(hasattr(client, "_online"))
-            while not client._online.is_set():
-                time.sleep(0.01)
             answer = client.command("dummy", 1, 2, 3)
-            self.assertTrue(answer["executed"])
+            self.assertTrue(answer.executed)
 
     @patch("discos_client.utils.load_certificate")
     def test_command_unreachable(self, mock_load_cert):
@@ -372,10 +374,11 @@ class TestDISCOSClient(unittest.TestCase):
                 address="127.0.0.1",
                 sub_port=DEFAULT_SUB_PORT,
                 req_port=DEFAULT_REQ_PORT,
-                telescope="SRT"
+                telescope="SRT",
+                identity="identity"
             )
             self.assertTrue(hasattr(client, "command"))
-            self.assertFalse(client.command("dummy")["executed"])
+            self.assertFalse(client.command("dummy").executed)
 
     def test_command_not_present(self):
         client = DISCOSClient(
@@ -385,15 +388,44 @@ class TestDISCOSClient(unittest.TestCase):
         self.assertFalse(hasattr(client, "command"))
 
     @patch("discos_client.utils.load_certificate")
-    def test_command_keys_not_present(self, mock_load_cert):
+    def test_command_unknown_keys(self, mock_load_cert):
         mock_load_cert.side_effect = OSError
-        client = DISCOSClient(
-            address="127.0.0.1",
-            sub_port=DEFAULT_SUB_PORT,
-            req_port=DEFAULT_REQ_PORT,
-            telescope="SRT"
-        )
-        self.assertFalse(hasattr(client, "command"))
+        with self.assertRaises(ValueError) as ex:
+            DISCOSClient(
+                address="127.0.0.1",
+                sub_port=DEFAULT_SUB_PORT,
+                req_port=DEFAULT_REQ_PORT,
+                telescope="SRT",
+                identity="dummy"
+            )
+        self.assertIn("Unknown or invalid identity", str(ex.exception))
+
+    @patch("discos_client.utils.load_certificate")
+    def test_command_disconnect_after_send(self, mock_load_cert):
+        mock_load_cert.return_value = (dummy_public, dummy_secret)
+        with TestPublisher(router=True):
+            client = DISCOSClient(
+                address="127.0.0.1",
+                sub_port=DEFAULT_SUB_PORT,
+                req_port=DEFAULT_REQ_PORT,
+                telescope="SRT",
+                identity="identity"
+            )
+            self.assertTrue(hasattr(client, "command"))
+            answer = client.command("disconnect")
+            self.assertFalse(answer.executed)
+
+
+class TestTelescopeClients(unittest.TestCase):
+
+    def test_srt_client(self):
+        _ = SRTClient()
+
+    def test_medicina_client(self):
+        _ = MedicinaClient()
+
+    def test_noto_client(self):
+        _ = NotoClient()
 
 
 if __name__ == '__main__':

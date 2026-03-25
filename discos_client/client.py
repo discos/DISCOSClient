@@ -7,15 +7,11 @@ from typing import Any
 import zmq
 from zmq.utils.monitor import recv_monitor_message
 from .namespace import DISCOSNamespace
-from .utils import rand_id, get_auth_keys
+from .utils import rand_id, get_auth_keys, timestamp
 from .initializer import NSInitializer
 
 
-__all__ = [
-    "DEFAULT_SUB_PORT",
-    "DEFAULT_REQ_PORT",
-    "DISCOSClient"
-]
+__all__ = ["DISCOSClient", "SRTClient", "MedicinaClient", "NotoClient"]
 
 DEFAULT_SUB_PORT = 16000
 DEFAULT_REQ_PORT = 16010
@@ -23,67 +19,64 @@ DEFAULT_REQ_PORT = 16010
 
 class DISCOSClient:
     """
-    Class that implements a DISCOSClient. It handles incoming ZMQ messages from
-    the DISCOS control software.
+    Class that implements a generic DISCOSClient. It handles incoming ZMQ
+    messages from the DISCOS control software and eventually allows the user
+    to send remote commands.
     """
 
     def __init__(
         self,
         *topics: str,
         address: str,
-        sub_port: int,
-        req_port: int | None = None,
-        telescope: str | None = None
+        sub_port: int = DEFAULT_SUB_PORT,
+        req_port: int = DEFAULT_REQ_PORT,
+        telescope: str | None = None,
+        identity: str | None = None
     ) -> None:
         """
-        Initializes the class instance.
-
         :param topics: topic names to subscribe to.
         :param address: IP address to subscribe to.
         :param sub_port: TCP port where the subscriber socket will connect.
         :param req_port: TCP port where the requester socket will connect.
         :param telescope: name of the telescope the client is connecting to.
+        :param identity: name of the key file to be used for sending remote
+                         commands. Ideally, each application should have and
+                         use its own identity.
         :raises ValueError: If one or more given topics are not known.
+        :raises FileNotFoundError: If the provided identity file is missing.
+        :raises ValueError: If the the provided identity file does not contain
+                            a valid key pair.
         """
         if telescope not in ("Medicina", "Noto", "SRT", None):
             raise ValueError(f"Unknown telescope: '{telescope}'")
-        initializer = NSInitializer(telescope)
-        self._topics = self.__validate_topics__(initializer, topics)
+        self._initializer = NSInitializer(telescope)
+        self._topics = self.__validate_topics__(self._initializer, topics)
         self._client_id = rand_id()
         self._stop = Event()
         self._context = zmq.Context()
 
-        events = {}
-        events["stop"] = self._stop
+        self._events = {}
+        self._events["stop"] = self._stop
 
         self._sub = self._context.socket(zmq.SUB)
         self._sub.setsockopt(zmq.LINGER, 0)
-        self._sub.setsockopt(zmq.RCVTIMEO, 10)
         self._sub.setsockopt(zmq.RECONNECT_IVL, 1000)
         self._sub.setsockopt(zmq.CONNECT_TIMEOUT, 500)
         self._sub.connect(f"tcp://{address}:{sub_port}")
 
-        sockets = {}
-        sockets["sub"] = self._sub
-
-        if req_port and telescope:
-            self.__init_req_socket__(
-                address, req_port, telescope, events, sockets
-            )
+        self._sockets = {}
+        self._sockets["sub"] = self._sub
 
         self._locks = defaultdict(Lock)
 
-        for topic in self._topics:
-            self.__dict__[topic] = initializer.initialize(topic)
-
-        self._updater = Thread(
-            target=self.__update__,
+        self._receiver = Thread(
+            target=self.__receive__,
             args=(
-                self._client_id,
-                sockets,
+                self._sub,
                 self._locks,
+                self._client_id,
                 self.__dict__,
-                events,
+                self._stop
             ),
             daemon=True
         )
@@ -92,49 +85,86 @@ class DISCOSClient:
             self,
             self.__cleanup__,
             self._stop,
-            self._updater,
-            sockets,
+            self._receiver,
+            self._sockets,
             self._context
         )
 
-        self._updater.start()
+        if telescope and identity:
+            try:
+                public, secret, server = get_auth_keys(telescope, identity)
+            except OSError as ex:
+                raise ValueError(
+                    f"Unknown or invalid identity '{identity}'."
+                ) from ex
+            self._client_public = public
+            self._client_secret = secret
+            self._server_public = server
+            self.__init_req_socket__(f"tcp://{address}:{req_port}")
+            self.command = self.__command__
+
+        for topic in self._topics:
+            self.__dict__[topic] = self._initializer.initialize(topic)
+
+        self._receiver.start()
         for topic in self._topics:
             self._sub.subscribe(f"{self._client_id}{topic}")
 
-    def __init_req_socket__(
-        self,
-        address: str,
-        req_port: int,
-        telescope: str,
-        events: dict[str, Event],
-        sockets: dict[str, zmq.Socket]
-    ) -> None:
-        try:
-            client_public, client_secret, server_public = get_auth_keys(
-                telescope
-            )
-        except OSError:
-            # A curve key is missing, this
-            # telemetry and will not be able to send commands
-            return
+    def __command__(self, cmd: str, *args) -> DISCOSNamespace:
+        """
+        Sends a command to the remote server.
+
+        This method is only available if the DISCOSClient instance finds the
+        correct authentication keys.
+
+        :param cmd: The name of the command.
+        :param args: A series of arguments to be inclueded in the command.
+        :return: A DISCOSNamespace containing the command answer.
+        """
+        answer = self._initializer.initialize("command_answer", False)
+        answer <<= {"command": cmd}
+        if not self.__req_connected__():
+            answer <<= self.__unreachable_error__()
+            return answer
+
+        payload = {"command": cmd, "async": True}
+        if args:
+            payload["args"] = args
+
+        payload = json.dumps(payload, separators=(",", ":"))
+        self._req.send_string(payload)
+
+        while self.__req_connected__(strict=True):
+            if (self._req.poll(10) & zmq.POLLIN) != 0:
+                answer <<= json.loads(self._req.recv_string())
+                return answer
+
+        # We lost connection between send and receive, we need to reinitialize
+        # the REQ socket
+        endpoint = self._req.get_string(zmq.LAST_ENDPOINT)
+        self._mon.close()
+        self._req.close()
+        self.__init_req_socket__(endpoint)
+        answer <<= self.__unreachable_error__()
+        return answer
+
+    def __init_req_socket__(self, endpoint: str) -> None:
         self._req = self._context.socket(zmq.REQ)
         self._req.setsockopt(zmq.LINGER, 0)
         self._req.setsockopt(zmq.IMMEDIATE, 1)
-        self._req.setsockopt(zmq.SNDTIMEO, 0)
         self._req.setsockopt(zmq.RECONNECT_IVL, 1000)
         self._req.setsockopt(zmq.CONNECT_TIMEOUT, 500)
         self._req.setsockopt(zmq.HEARTBEAT_IVL, 1000)
         self._req.setsockopt(zmq.HEARTBEAT_TIMEOUT, 1000)
-        self._req.curve_publickey = client_public
-        self._req.curve_secretkey = client_secret
-        self._req.curve_serverkey = server_public
+        self._req.curve_publickey = self._client_public
+        self._req.curve_secretkey = self._client_secret
+        self._req.curve_serverkey = self._server_public
         self._mon = self._req.get_monitor_socket()
         self._online = Event()
-        events["online"] = self._online
-        self._req.connect(f"tcp://{address}:{req_port}")
-        sockets["req"] = self._req
-        sockets["mon"] = self._mon
-        self.command = self.__command__
+        self._events["online"] = self._online
+        self._req.connect(endpoint)
+        self._sockets["req"] = self._req
+        self._sockets["mon"] = self._mon
 
     @staticmethod
     def __validate_topics__(
@@ -161,7 +191,7 @@ class DISCOSClient:
     @staticmethod
     def __cleanup__(
         stop: Event,
-        updater: Thread,
+        receiver: Thread,
         sockets: dict[str, zmq.Socket],
         context: zmq.Context
     ) -> None:
@@ -175,7 +205,7 @@ class DISCOSClient:
         """
         stop.set()
         try:
-            updater.join()
+            receiver.join()
         except RuntimeError:  # pragma: no cover
             pass
         for _, socket in sockets.items():
@@ -184,88 +214,73 @@ class DISCOSClient:
         context.term()
 
     @staticmethod
-    def __update__(
-        client_id: str,
-        sockets: dict[str, zmq.Socket],
+    def __receive__(
+        sub: zmq.Socket,
         locks: dict[str, Lock],
+        client_id: str,
         namespaces: dict[str, DISCOSNamespace],
-        events: dict[str, Event]
+        stop: Event
     ) -> None:
         """
-        Loops continuously waiting for new ZMQ messages and events.
+        Loops continuously waiting for new ZMQ messages.
 
-        :param client_id: The random string identifying the client.
-        :param sockets: The dictionary containing the ZMQ sockets.
+        :param socket: The ZMQ socket object.
         :param locks: The locks dictionary, used for thread synchronization.
-        :param namespaces: The client __dict__ object, containing the
-                           DISCOSNamespaces.
-        :param events: The dictionary containing the Event objects for
-                       synchronization.
+        :param client_id: The random string identifying the client.
+        :param d: The client __dict__ object.
+        :param event: The Event object that will break the receiver loop.
         """
-        sub = sockets.get("sub")
-        mon = sockets.get("mon")
-        stop = events.get("stop")
-        online = events.get("online")
-
-        poller = zmq.Poller()
-        poller.register(sub, zmq.POLLIN)
-        if mon is not None:
-            poller.register(mon, zmq.POLLIN)
         while not stop.is_set():
-            zmq_events = {}
-            try:
-                zmq_events = dict(poller.poll(timeout=200))
-            except zmq.ZMQError:  # pragma: no cover
-                break
+            if (sub.poll(10) & zmq.POLLIN) != 0:
+                t, p = sub.recv_multipart()  # noqa
+                t = t.decode("ascii")
+                if t.startswith(client_id):
+                    sub.unsubscribe(t)
+                    t = t[len(client_id):]
+                    sub.subscribe(t)
+                p = json.loads(p)
+                with locks[t]:
+                    namespaces[t] <<= p
 
-            if sub in zmq_events:
-                try:
-                    t, p = sub.recv_multipart(flags=zmq.DONTWAIT)  # noqa
-                    t = t.decode("ascii")
-                    if t.startswith(client_id):
-                        sub.unsubscribe(t)
-                        t = t[len(client_id):]
-                        sub.subscribe(t)
-                    p = json.loads(p)
-                    with locks[t]:
-                        namespaces[t] <<= p
-                except zmq.Again:  # pragma: no cover
-                    # We should never get here since there will always be
-                    # some data to recover from the socket
-                    pass
+    def __req_connected__(self, strict: bool = False) -> bool:
+        """
+        Checks if the REQ socket is connected.
 
-            if mon is not None and mon in zmq_events:
-                while True:
-                    try:
-                        event = recv_monitor_message(mon, flags=zmq.DONTWAIT)
-                    except zmq.Again:
-                        break
+        :param strict: If True, this method will return false if a
+                       disconnection happened, even if the socket was
+                       finally reconnected.
+        :return: A boolean indicating where the REQ socket is connected.
+        """
+        disconnection_detected = False
+        while self._mon.poll(0) & zmq.POLLIN:
+            msg = recv_monitor_message(self._mon)
+            event = msg["event"]
+            if event == zmq.EVENT_CONNECTED:
+                self._online.set()
+            elif event in (zmq.EVENT_DISCONNECTED, zmq.EVENT_CLOSED):
+                self._online.clear()
+                disconnection_detected = True
+        currently_online = self._online.is_set()
+        if strict:
+            return currently_online and not disconnection_detected
+        return currently_online
 
-                    event = event["event"]
-                    if event == zmq.EVENT_CONNECTED:
-                        online.set()
-                    elif event in \
-                            (zmq.EVENT_DISCONNECTED, zmq.EVENT_CLOSED):
-                        online.clear()
+    @staticmethod
+    def __unreachable_error__() -> dict[str, Any]:
+        """
+        Returns a DISCOSUnreachableError answer.
 
-    def __command__(self, cmd: str, *args) -> dict[str, Any]:
-        if self._online.is_set():
-            message = {"command": cmd}
-            if args:
-                message["args"] = args
-            payload = json.dumps(message, separators=(",", ":"))
-            self._req.send_string(payload)
-            answer = json.loads(self._req.recv_string())
-        else:
-            answer = {
-                "executed": False,
-                "error": {
-                    "type": 2101,  # ClientErrors
-                    "code": 14,    # DISCOSUnreachableError
-                    "description": "DISCOS is unreachable"
-                }
-            }
-        return answer
+        :return: The DISCOSUnreachable answer.
+        """
+        return {
+            "executed": False,
+            "error_trace": [{
+                "message": "DISCOS is unreachable",
+                "category": 2101,   # ClientErrors
+                "code": 14,         # DISCOSUnreachableError
+            }],
+            "timestamp": timestamp()
+        }
 
     def __repr__(self) -> str:
         """
@@ -289,27 +304,27 @@ class DISCOSClient:
 
         :param spec: Format specifier.
 
-            | 'c' - compact JSON
+            | 't' - tight JSON
             | '<n>i' - indented JSON \
 with optional indentation level <n> (default is 2)
-            | 'f' - full representation with metadata
+            | 'e' - entire representation with metadata
             | 'm' - metadata only representation
 
         :return: A JSON formatted string.
         :raises ValueError: If the given format specifier is not known or
                             contains errors.
         """
-        has_f = "f" in spec
+        has_e = "e" in spec
         has_m = "m" in spec
 
-        if has_f and has_m:
+        if has_e and has_m:
             raise ValueError(
-                "Format specifier cannot contain both 'f' and 'm'."
+                "Format specifier cannot contain both 'e' and 'm'."
             )
 
-        if has_f:
-            fmt_spec = spec[1:] if spec.startswith("f") else spec
-            fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("f") else fmt_spec
+        if has_e:
+            fmt_spec = spec[1:] if spec.startswith("e") else spec
+            fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("e") else fmt_spec
         elif has_m:
             fmt_spec = spec[1:] if spec.startswith("m") else spec
             fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("m") else fmt_spec
@@ -319,14 +334,14 @@ with optional indentation level <n> (default is 2)
         indent = None
         separators = None
         default = (
-            DISCOSNamespace.__full_dict__ if has_f
+            DISCOSNamespace.__full_dict__ if has_e
             else DISCOSNamespace.__metadata_dict__ if has_m
             else DISCOSNamespace.__message_dict__
         )
 
         if fmt_spec == "":
             pass
-        elif fmt_spec == "c":
+        elif fmt_spec == "t":
             separators = (",", ":")
         elif fmt_spec.endswith("i"):
             fmt_par = fmt_spec[:-1]
@@ -371,3 +386,63 @@ with optional indentation level <n> (default is 2)
         for topic in self._topics:
             self._locks[topic].release()
         return result
+
+
+class SRTClient(DISCOSClient):
+    # pylint: disable=too-few-public-methods
+    """
+    Creates a client configured for the **Sardinia Radio Telescope (SRT)**.
+    """
+
+    def __init__(self, *topics: str, identity: str | None = None) -> None:
+        """
+        :param topics: Topic names to subscribe to.
+        :param identity: Name of the key pair file to be used in order to
+                              send commands.
+        """
+        super().__init__(
+            *topics,
+            address="192.168.200.203",
+            telescope="SRT",
+            identity=identity
+        )
+
+
+class MedicinaClient(DISCOSClient):
+    # pylint: disable=too-few-public-methods
+    """
+    Creates a client configured for the **Medicina Radio Telescope**.
+    """
+
+    def __init__(self, *topics: str, identity: str | None = None) -> None:
+        """
+        :param topics: Topic names to subscribe to.
+        :param identity: Name of the key pair file to be used in order to
+                              send commands.
+        """
+        super().__init__(
+            *topics,
+            address="192.168.1.100",
+            telescope="Medicina",
+            identity=identity
+        )
+
+
+class NotoClient(DISCOSClient):
+    # pylint: disable=too-few-public-methods
+    """
+    Creates a client configured for the **Noto Radio Telescope**.
+    """
+
+    def __init__(self, *topics: str, identity: str | None = None) -> None:
+        """
+        :param topics: Topic names to subscribe to.
+        :param identity: Name of the key pair file to be used in order to
+                              send commands.
+        """
+        super().__init__(
+            *topics,
+            address="192.167.187.17",
+            telescope="Noto",
+            identity=identity
+        )

@@ -2,6 +2,8 @@ from __future__ import annotations
 import operator
 import secrets
 import string
+import time
+from datetime import datetime, timezone
 from typing import Any, Callable
 from importlib.resources import files
 from pathlib import Path
@@ -15,7 +17,8 @@ __all__ = [
     "delegated_operations",
     "delegated_comparisons",
     "public_dict",
-    "get_auth_keys"
+    "get_auth_keys",
+    "timestamp"
 ]
 
 META_KEYS = ("type", "title", "description", "format", "unit", "enum")
@@ -118,6 +121,9 @@ def public_dict(
     """
     d = {}
     for k, v in vars(obj).items():
+        if callable(v):
+            # We don't need to include methods
+            continue
         if k == "_value":
             if isinstance(v, (list, tuple)):
                 d["items"] = __unwrap(v, is_fn, get_value_fn)
@@ -152,20 +158,36 @@ def __unwrap(value: Any, is_fn, get_value_fn) -> Any:
     return list(value) if isinstance(value, (list, tuple)) else value
 
 
-def get_auth_keys(telescope: str) -> tuple[bytes]:
+def get_auth_keys(
+    telescope: str,
+    identity: str
+) -> tuple[bytes]:
     """Retrieves the CURVE authentication keys, both for the client and
     the desired server.
 
     :param telescope: The telescope for which the server public key will be
                       retrieved.
+    :param identity: The name of the key pair file to be used.
     :return: The client's public and secret keys, followed by the server's
              public key, as a tuple.
     """
     config_base = Path(user_config_dir("discos"))
     curve_directory = config_base / "rpc" / "client"
-    client_pair = curve_directory / "identity.key_secret"
+    client_pair = curve_directory / f"{identity}.key_secret"
     server_pair = files("discos_client") / "servers" \
         / telescope.lower() / "server.key"
     client_public, client_secret = load_certificate(client_pair)
     server_public, _ = load_certificate(server_pair)
     return client_public, client_secret, server_public
+
+
+def timestamp() -> dict[str, Any]:
+    now = time.time()
+    iso8601 = datetime.fromtimestamp(now, tz=timezone.utc)
+    iso8601 = iso8601.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return {
+        "unix_time": now,
+        "omg_time": int((now + 12219292800) * 10_000_000),
+        "mjd": (now / 86400.0) + 40587.0,
+        "iso8601": iso8601
+    }

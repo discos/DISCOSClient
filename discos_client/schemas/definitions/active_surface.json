@@ -7,7 +7,7 @@
   "properties": {
     "LUTFilename": {
       "type": "string",
-      "title": "LookUp Table file name",
+      "title": "LookUp Table File Name",
       "description": "Name of the lookup table file being used."
     },
     "profile": {

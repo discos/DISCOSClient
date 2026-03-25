@@ -28,6 +28,20 @@
         }
       ]
     },
+    "LAN_2_7": {
+      "allOf": [
+        { "$ref": "#/$defs/LAN_2_6" },
+        {
+          "type": "object",
+          "properties": {
+            "USD07": { "$ref": "../definitions/USD.json" }
+          },
+          "initialize": [
+            "USD07"
+          ]
+        }
+      ]
+    },
     "SECTOR": {
       "type": "object",
       "title": "Active surface sector",
@@ -39,7 +53,7 @@
         "LAN04": { "$ref": "#/$defs/LAN_2_6" },
         "LAN05": { "$ref": "#/$defs/LAN_2_6" },
         "LAN06": { "$ref": "#/$defs/LAN_2_6" },
-        "LAN07": { "$ref": "#/$defs/LAN_2_6" },
+        "LAN07": { "$ref": "#/$defs/LAN_2_7" },
         "LAN08": { "$ref": "#/$defs/LAN_2_6" },
         "LAN09": { "$ref": "#/$defs/LAN_2_6" },
         "LAN10": { "$ref": "#/$defs/LAN_2_6" },

@@ -59,9 +59,13 @@ class NSInitializer:
             self._precompile_patternprops(schema)
             self.schemas[schema_id] = schema
 
+        self.available_topics = list(self.node_to_id.keys())
+        self.available_topics.remove("command_answer")
+
     def initialize(
         self,
-        topic: str
+        topic: str,
+        reactive: bool = True,
     ) -> DISCOSNamespace:
         """
         Build the initial :class:`DISCOSNamespace` for the given topic.
@@ -79,10 +83,15 @@ class NSInitializer:
         """
         if topic not in self.node_to_id:  # pragma: no cover
             raise ValueError(f"Schema '{topic}' was not loaded.")
-        topic = self.node_to_id[topic]
-        schema = self.schemas[topic]
+        node_id = self.node_to_id[topic]
+        schema = self.schemas[node_id]
         payload = self._initialize_from_schema(schema)
-        return DISCOSNamespace(schema=schema, **payload)
+        return DISCOSNamespace(
+            schema=schema,
+            node_name=topic,
+            reactive=reactive,
+            **payload
+        )
 
     def get_topics(self) -> list[str]:
         """
@@ -90,7 +99,7 @@ class NSInitializer:
 
         :return: All topic names loaded from schema files.
         """
-        return list(self.node_to_id.keys())
+        return self.available_topics
 
     def _literal_prefix(self, pat: str) -> str:
         """

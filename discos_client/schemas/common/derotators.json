@@ -52,6 +52,11 @@
           "title": "Slewing",
           "description": "Indicates whether the derotator is currently slewing."
         },
+        "socketConnected": {
+          "type": "boolean",
+          "title": "Socket connected",
+          "description": "Derotator socket is connected."
+        },
         "timestamp": {
           "$ref": "../definitions/timestamp.json"
         },
@@ -75,6 +80,7 @@
         "ready",
         "rewindingStep",
         "slewing",
+        "socketConnected",
         "timestamp",
         "tracking",
         "trackingError"

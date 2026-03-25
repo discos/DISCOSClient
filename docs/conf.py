@@ -1,11 +1,24 @@
 import os
 import importlib
 import sys
-from sphinx.ext.autodoc import ClassDocumenter
+from sphinx import addnodes
+from sphinx.pycode import ModuleAnalyzer
+from sphinx.ext.autodoc import MethodDocumenter, ClassDocumenter
+
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.abspath('../discos_client'))
 
 from patches import _simpletype, _complexstructures, _reference, _transform
+
+# We add these methods which are normally "hidden"
+from discos_client.client import DISCOSClient
+DISCOSClient.command = DISCOSClient.__command__
+from discos_client.namespace import DISCOSNamespace
+DISCOSNamespace.bind = DISCOSNamespace.__bind__
+DISCOSNamespace.copy = DISCOSNamespace.__copy__
+DISCOSNamespace.get_value = DISCOSNamespace.__get_value__
+DISCOSNamespace.unbind = DISCOSNamespace.__unbind__
+DISCOSNamespace.wait = DISCOSNamespace.__wait__
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -25,6 +38,8 @@ extensions = [
     'sphinx_autodoc_typehints',
     'sphinx-jsonschema',
 ]
+
+autoclass_content = "both"
 
 autodoc_typehints = "none"
 
@@ -53,6 +68,8 @@ html_theme = 'sphinx_rtd_theme'
 html_theme_options = {
     "style_external_links": True,
     "collapse_navigation": False,
+    "sticky_navigation": True,
+    "titles_only": False,
     "navigation_depth": 3,
     "prev_next_buttons_location": "bottom",
 }
@@ -62,6 +79,24 @@ html_css_files = [
 ]
 
 html_static_path = ['_static']
+
+
+def setup(app):
+    app.connect("viewcode-find-source", on_viewcode_find_source)
+
+def on_viewcode_find_source(app, modname):
+    analyzer = ModuleAnalyzer.for_module(modname)
+    analyzer.find_tags()
+    if modname == "discos_client.client":
+        if "DISCOSClient.__command__" in analyzer.tags:
+            analyzer.tags["DISCOSClient.command"] = analyzer.tags.get("DISCOSClient.__command__")
+            analyzer.tags["SRTClient.command"] = analyzer.tags.get("DISCOSClient.__command__")
+            analyzer.tags["MedicinaClient.command"] = analyzer.tags.get("DISCOSClient.__command__")
+            analyzer.tags["NotoClient.command"] = analyzer.tags.get("DISCOSClient.__command__")
+    if modname == "discos_client.namespace":
+        if "DISCOSNamespace.__get_value__" in analyzer.tags:
+            analyzer.tags["DISCOSNamespace.get_value"] = analyzer.tags.get("DISCOSNamespace.__get_value__")
+    return analyzer.code, analyzer.tags
 
 
 sjs_wide_format = importlib.import_module("sphinx-jsonschema.wide_format")
