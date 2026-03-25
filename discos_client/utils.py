@@ -182,25 +182,19 @@ def get_server_public_key(
 ) -> bytes:
     """Retrieve the CURVE public key of a DISCOS RPC server.
 
-    The server public key can be obtained either from a predefined
-    telescope configuration or from an explicit key file.
-
-    Exactly one of the following must be provided:
-      - ``telescope``: loads the key from the package resources
-        (``discos_client/servers/<telescope>/server.key``)
-      - ``server_public_key_file``: loads the key from a user-specified path
+    If ``server_public_key_file`` is provided, it overrides the default
+    server key associated with ``telescope``. Otherwise, the bundled key
+    for the given telescope is used.
 
     :param telescope: The telescope name used to locate a bundled server key.
     :param server_public_key_file: Path to a server public key file.
+        If provided, it overrides the default key associated with
+        ``telescope``.
     :return: The server public key.
-    :raises ValueError: If both or neither arguments are provided.
-    :raises OSError: If the key file cannot be found or loaded.
+    :raises ValueError: If neither ``telescope`` nor
+        ``server_public_key_file`` is provided.
+    :raises OSError: If the selected key file cannot be found or loaded.
     """
-    if telescope is not None and server_public_key_file is not None:
-        raise ValueError(
-            "Use either 'telescope' or 'server_public_key_file', not both."
-        )
-
     if server_public_key_file is not None:
         server_public, _ = load_certificate(Path(server_public_key_file))
         return server_public
@@ -224,21 +218,20 @@ def get_auth_keys(
 ) -> tuple[bytes, bytes, bytes]:
     """Retrieve CURVE authentication keys for both client and server.
 
-    This function loads:
-      - the client key pair associated with the given ``identity``
-      - the server public key, either from a telescope profile or an
-        explicit file
-
-    The server key selection follows these rules:
-      - if ``server_public_key_file`` is provided, it is used
-      - otherwise, ``telescope`` must be provided to load a bundled key
+    The client key pair is loaded from the user configuration associated
+    with ``identity``. The server public key is loaded from
+    ``server_public_key_file`` if provided; otherwise, the bundled key
+    for ``telescope`` is used.
 
     :param identity: The name of the client identity (key file prefix).
     :param telescope: The telescope name used to locate a bundled server key.
     :param server_public_key_file: Path to a server public key file.
+        If provided, it overrides the default key associated with
+        ``telescope``.
     :return: A tuple containing (client_public, client_secret, server_public).
-    :raises ValueError: If neither or both server key sources are provided.
-    :raises OSError: If any key file cannot be found or loaded.
+    :raises ValueError: If neither ``telescope`` nor
+        ``server_public_key_file`` is provided.
+    :raises OSError: If any selected key file cannot be found or loaded.
     """
     client_public, client_secret = get_client_auth_keys(identity)
     server_public = get_server_public_key(telescope, server_public_key_file)

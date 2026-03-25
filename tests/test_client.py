@@ -432,26 +432,6 @@ class TestDISCOSClient(unittest.TestCase):
             self.assertTrue(answer.executed)
 
     @patch("discos_client.utils.load_certificate")
-    def test_command_with_telescope_and_server_public_key_file(
-        self,
-        mock_load_cert
-    ):
-        mock_load_cert.return_value = (dummy_public, dummy_secret)
-        with self.assertRaises(ValueError) as ex:
-            DISCOSClient(
-                address="127.0.0.1",
-                sub_port=DEFAULT_SUB_PORT,
-                req_port=DEFAULT_REQ_PORT,
-                telescope="SRT",
-                identity="identity",
-                server_public_key_file="/tmp/server.key",
-            )
-        self.assertIn(
-            "Use either 'telescope' or 'server_public_key_file', not both.",
-            str(ex.exception)
-        )
-
-    @patch("discos_client.utils.load_certificate")
     def test_command_without_telescope_or_server_public_key_file(
         self,
         mock_load_cert
