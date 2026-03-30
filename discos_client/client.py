@@ -433,7 +433,7 @@ class MedicinaClient(DISCOSClient):
         """
         super().__init__(
             *topics,
-            address="192.168.1.100",
+            address="192.168.1.102",
             telescope="Medicina",
             identity=identity
         )
