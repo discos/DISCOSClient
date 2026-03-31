@@ -424,6 +424,7 @@ class TestDISCOSClient(unittest.TestCase):
                 address="127.0.0.1",
                 sub_port=DEFAULT_SUB_PORT,
                 req_port=DEFAULT_REQ_PORT,
+                telescope="SRT",
                 identity="identity",
                 server_public_key_file="/tmp/server.key",
             )
