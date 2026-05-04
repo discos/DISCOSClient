@@ -80,6 +80,8 @@ html_css_files = [
 
 html_static_path = ['_static']
 
+latex_engine = 'lualatex'
+
 
 def setup(app):
     app.connect("viewcode-find-source", on_viewcode_find_source)
@@ -94,8 +96,9 @@ def on_viewcode_find_source(app, modname):
             analyzer.tags["MedicinaClient.command"] = analyzer.tags.get("DISCOSClient.__command__")
             analyzer.tags["NotoClient.command"] = analyzer.tags.get("DISCOSClient.__command__")
     if modname == "discos_client.namespace":
-        if "DISCOSNamespace.__get_value__" in analyzer.tags:
-            analyzer.tags["DISCOSNamespace.get_value"] = analyzer.tags.get("DISCOSNamespace.__get_value__")
+        for method in ["bind", "copy", "get_value", "unbind", "wait"]:
+            if f"DISCOSNamespace.__{method}__" in analyzer.tags:
+                analyzer.tags[f"DISCOSNamespace.{method}"] = analyzer.tags.get(f"DISCOSNamespace.__{method}__")
     return analyzer.code, analyzer.tags
 
 

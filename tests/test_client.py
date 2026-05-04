@@ -13,6 +13,7 @@ from zmq.auth.thread import ThreadAuthenticator
 from discos_client.client import DISCOSClient, \
     SRTClient, MedicinaClient, NotoClient, \
     DEFAULT_SUB_PORT, DEFAULT_REQ_PORT
+from discos_client.namespace import DISCOSNamespace
 
 
 if sys.platform == "win32":
@@ -320,6 +321,12 @@ class TestDISCOSClient(unittest.TestCase):
             client.antenna.unbind(int)  # Never bound callback
             client.antenna.unbind(None)  # Unbind all callbacks
 
+            def custom_predicate(_):
+                return True
+
+            client.antenna.bind(callback, predicate=custom_predicate)
+            client.antenna.unbind(callback, predicate=custom_predicate)
+
     def test_wait(self):
         with TestPublisher():
             client = DISCOSClient(
@@ -336,6 +343,43 @@ class TestDISCOSClient(unittest.TestCase):
                 antenna,
                 client.antenna.wait(timeout=5)
             )
+
+    def test_unwrap(self):
+        with TestPublisher("SRT"):
+            client = DISCOSClient(
+                address="127.0.0.1",
+                sub_port=DEFAULT_SUB_PORT
+            )
+
+            received_values = []
+
+            def callback(value):
+                received_values.append(value)
+
+            client.antenna.timestamp.unix_time.bind(
+                callback,
+                unwrap=True
+            )
+
+            start = time.time()
+            while not received_values and (time.time() - start) < 10:
+                time.sleep(0.1)
+
+            self.assertTrue(len(received_values) > 0)
+
+            first_val = received_values[0]
+            self.assertNotIsInstance(first_val, DISCOSNamespace)
+            self.assertIsInstance(first_val, float)
+
+            client.antenna.timestamp.unix_time.unbind(callback)
+
+            new_val = client.antenna.timestamp.unix_time.wait(
+                timeout=10,
+                unwrap=True
+            )
+
+            self.assertNotIsInstance(new_val, DISCOSNamespace)
+            self.assertIsInstance(new_val, float)
 
     @patch("discos_client.utils.load_certificate")
     def test_command(self, mock_load_cert):

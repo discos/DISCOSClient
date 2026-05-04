@@ -134,6 +134,14 @@
     {
       "type": "object",
       "properties": {
+        "availableReceivers": {
+          "type": "array",
+          "title": "Available Receivers",
+          "description": "List of available receivers.",
+          "items": {
+            "type": "string"
+          }
+        },
         "currentReceiver": {
           "type": "string",
           "title": "Current Receiver",
@@ -141,8 +149,8 @@
         },
         "currentSetup": {
           "type": "string",
-          "title": "Current setup",
-          "description": "Current DISCOS setup code"
+          "title": "Current Setup",
+          "description": "Currently selected receiver's setup code."
         },
         "status": {
           "$ref": "../definitions/status.json"
@@ -152,6 +160,7 @@
         }
       },
       "required": [
+        "availableReceivers",
         "currentReceiver",
         "currentSetup",
         "status",

@@ -194,7 +194,8 @@ class DISCOSNamespace:
     def __bind__(
         self,
         callback: Callable[[DISCOSNamespace], None],
-        predicate: Callable[[DISCOSNamespace], bool] = None
+        predicate: Callable[[DISCOSNamespace], bool] = None,
+        unwrap: bool = False
     ) -> None:
         """
         Bind a callback to the DISCOSNamespace object,
@@ -203,13 +204,13 @@ class DISCOSNamespace:
         :param callback: A function that receives the updated object
                          when obj changes.
         :param predicate: Optional predicate that the value must satisfy
+        :param unwrap: If True, evaluates the predicate and calls the callback
+                       passing the internal primitive value instead of the
+                       namespace.
         """
         with self._observers_lock:
-            self._observers.setdefault(callback, set()).add(
-                predicate
-                if predicate is not None
-                else lambda _: True
-            )
+            pred = predicate if predicate is not None else lambda _: True
+            self._observers.setdefault(callback, set()).add((pred, unwrap))
 
     def __unbind__(
         self,
@@ -232,20 +233,29 @@ class DISCOSNamespace:
             if callback not in self._observers:
                 return
             if predicate is not None:
-                self._observers[callback].discard(predicate)
+                to_remove = [
+                    p_tuple
+                    for p_tuple in self._observers[callback]
+                    if p_tuple[0] == predicate
+                ]
+                for p_tuple in to_remove:
+                    self._observers[callback].discard(p_tuple)
             if predicate is None or not self._observers[callback]:
                 del self._observers[callback]
 
     def __wait__(
         self,
         predicate: Callable[[DISCOSNamespace], bool] = None,
-        timeout: float | None = None
-    ) -> DISCOSNamespace:
+        timeout: float | None = None,
+        unwrap: bool = False
+    ) -> Any:
         """
         Block until the DISCOSNamespace triggers a change notification.
 
         :param predicate: Optional predicate that the value must satisfy.
         :param timeout: Optional timeout in seconds.
+        :param unwrap: If True, the predicate operates on the internal value,
+                       and the internal value itself is returned.
         :return: The updated object, or the same object if timeout has expired.
         """
         event = threading.Event()
@@ -253,12 +263,14 @@ class DISCOSNamespace:
         def callback(_):
             event.set()
 
-        self.bind(callback, predicate)
+        self.bind(callback, predicate, unwrap=unwrap)
         try:
             event.wait(timeout)
         finally:
             self.unbind(callback, predicate)
         with self._lock:
+            if unwrap and self.__has_value__(self):
+                return self._value
             return self
 
     def __copy__(self) -> DISCOSNamespace:
@@ -854,9 +866,20 @@ node key
             observers = list(self._observers.items())
 
         with self._lock:
-            for cb, predicates in observers:
-                if any(predicate(self) for predicate in predicates):
-                    cb(self)
+            for cb, conditions in observers:
+                should_call = False
+                value_to_pass = self
+
+                for predicate, unwrap in conditions:
+                    value_to_test = self._value if unwrap \
+                        and self.__has_value__(self) else self
+
+                    if predicate(value_to_test):
+                        should_call = True
+                        value_to_pass = value_to_test
+                        break
+                if should_call:
+                    cb(value_to_pass)
 
     def __getattr__(self, name: str):
         """
