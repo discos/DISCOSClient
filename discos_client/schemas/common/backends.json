@@ -154,6 +154,38 @@
   "anyOf": [
     {
       "type": "object",
+      "properties": {
+        "availableBackends": {
+          "type": "array",
+          "title": "Available Backends",
+          "description": "List of available backends.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "currentBackend": {
+          "type": "string",
+          "title": "Current Backend",
+          "description": "Currently selected backend's name."
+        },
+        "currentSetup": {
+          "type": "string",
+          "title": "Current Setup",
+          "description": "Currently selected backend's setup code."
+        },
+        "timestamp": {
+          "$ref": "../definitions/timestamp.json"
+        }
+      },
+      "required": [
+        "availableBackends",
+        "currentBackend",
+        "currentSetup",
+        "timestamp"
+      ]
+    },
+    {
+      "type": "object",
       "patternProperties": {
         "^[A-Za-z0-9_]+$": { "$ref": "#/$defs/backend" }
       },

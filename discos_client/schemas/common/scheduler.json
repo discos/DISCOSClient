@@ -21,10 +21,20 @@
       "title": "Current Recorder",
       "description": "Name of the currently used recorder."
     },
+    "maxScanID": {
+      "type": "number",
+      "title": "Max Scan ID",
+      "description": "Identification number of the final scan of the current schedule."
+    },
+    "maxSubScanID": {
+      "type": "number",
+      "title": "Max SubScan ID",
+      "description": "Identification number of the final subscan of the current scan."
+    },
     "projectCode": {
       "type": "string",
       "title": "Project Code",
-      "description": "Identification number of the current project user."
+      "description": "Identification code of the current project user."
     },
     "restFrequency": {
       "type": "array",
@@ -66,6 +76,8 @@
     "currentBackend",
     "currentDevice",
     "currentRecorder",
+    "maxScanID",
+    "maxSubScanID",
     "projectCode",
     "restFrequency",
     "scanID",
