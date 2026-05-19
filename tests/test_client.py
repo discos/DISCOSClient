@@ -4,6 +4,7 @@ import time
 import re
 import asyncio
 import sys
+import zlib
 from unittest.mock import patch
 from pathlib import Path
 from threading import Thread, Event
@@ -107,10 +108,10 @@ class TestPublisher:
             if op == 1 and re.match(r"^[0-9A-Za-z]{4}_.+$", topic):
                 t = topic.split("_", 1)[1]
                 if t in self.messages:
-                    message = json.dumps(
+                    message = zlib.compress(json.dumps(
                         self.messages[t],
                         separators=(",", ":")
-                    ).encode("utf-8")
+                    ).encode("utf-8"))
                     self.pub.send_multipart([
                         topic.encode("ascii"),
                         message
@@ -122,10 +123,10 @@ class TestPublisher:
                             subkey = key[len(t) + 1:]
                             subparts[subkey] = val
                     if subparts:
-                        message = json.dumps(
+                        message = zlib.compress(json.dumps(
                             subparts,
                             separators=(",", ":")
-                        ).encode("utf-8")
+                        ).encode("utf-8"))
                         self.pub.send_multipart([
                             topic.encode("ascii"), message
                         ])
@@ -156,10 +157,10 @@ class TestPublisher:
             if "." in topic:
                 topic, obj = topic.split(".", 1)
                 payload = {obj: payload}
-            payload = json.dumps(
+            payload = zlib.compress(json.dumps(
                 payload,
                 separators=(",", ":")
-            ).encode("utf-8")
+            ).encode("utf-8"))
             self.pub.send_multipart([
                 topic.encode("ascii"),
                 payload

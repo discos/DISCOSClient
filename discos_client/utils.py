@@ -21,7 +21,9 @@ __all__ = [
     "timestamp"
 ]
 
-META_KEYS = ("type", "title", "description", "format", "unit", "enum")
+META_KEYS = frozenset(
+    {"type", "title", "description", "format", "unit", "enum"}
+)
 
 
 def rand_id():

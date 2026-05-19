@@ -1,6 +1,7 @@
 from __future__ import annotations
 import json
 import weakref
+import zlib
 from threading import Thread, Lock, Event
 from collections import defaultdict
 from typing import Any
@@ -249,7 +250,7 @@ class DISCOSClient:
                     sub.unsubscribe(t)
                     t = t[len(client_id):]
                     sub.subscribe(t)
-                p = json.loads(p)
+                p = json.loads(zlib.decompress(p))
                 with locks[t]:
                     namespaces[t] <<= p
 

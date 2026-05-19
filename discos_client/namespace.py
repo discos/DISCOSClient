@@ -24,7 +24,7 @@ class DISCOSNamespace:
     """
 
     __typename__ = "DISCOSNamespace"
-    __private__ = (
+    __private__ = frozenset({
         "_lock",
         "_observers",
         "_observers_lock",
@@ -36,7 +36,7 @@ class DISCOSNamespace:
         "unbind",
         "wait",
         "copy"
-    )
+    })
 
     def __init__(
         self,
