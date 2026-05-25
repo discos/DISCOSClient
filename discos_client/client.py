@@ -1,11 +1,11 @@
 from __future__ import annotations
-import json
 import weakref
 import zlib
 from threading import Thread, Lock, Event
 from collections import defaultdict
 from typing import Any
 from pathlib import Path
+import orjson
 import zmq
 from zmq.utils.monitor import recv_monitor_message
 from .namespace import DISCOSNamespace
@@ -143,12 +143,11 @@ class DISCOSClient:
         if args:
             payload["args"] = args
 
-        payload = json.dumps(payload, separators=(",", ":"))
-        self._req.send_string(payload)
+        self._req.send(orjson.dumps(payload))
 
         while self.__req_connected__(strict=True):
             if (self._req.poll(10) & zmq.POLLIN) != 0:
-                answer <<= json.loads(self._req.recv_string())
+                answer <<= orjson.loads(self._req.recv())
                 return answer
 
         # We lost connection between send and receive, we need to reinitialize
@@ -250,9 +249,9 @@ class DISCOSClient:
                     sub.unsubscribe(t)
                     t = t[len(client_id):]
                     sub.subscribe(t)
-                p = json.loads(zlib.decompress(p))
+                payload = orjson.loads(zlib.decompress(p))
                 with locks[t]:
-                    namespaces[t] <<= p
+                    namespaces[t] <<= payload
 
     def __req_connected__(self, strict: bool = False) -> bool:
         """
@@ -328,58 +327,38 @@ with optional indentation level <n> (default is 2)
         """
         has_e = "e" in spec
         has_m = "m" in spec
+        has_i = "i" in spec
 
         if has_e and has_m:
             raise ValueError(
                 "Format specifier cannot contain both 'e' and 'm'."
             )
 
-        if has_e:
-            fmt_spec = spec[1:] if spec.startswith("e") else spec
-            fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("e") else fmt_spec
-        elif has_m:
-            fmt_spec = spec[1:] if spec.startswith("m") else spec
-            fmt_spec = fmt_spec[:-1] if fmt_spec.endswith("m") else fmt_spec
-        else:
-            fmt_spec = spec
+        fmt_spec = spec
+        for ch in ("e", "m", "i"):
+            fmt_spec = fmt_spec.replace(ch, "")
 
-        indent = None
-        separators = None
+        if fmt_spec not in ("", "t"):
+            raise ValueError(
+                f"Unknown format code '{spec}' for "
+                f"{self.__class__.__name__}"
+            )
+
         default = (
             DISCOSNamespace.__full_dict__ if has_e
             else DISCOSNamespace.__metadata_dict__ if has_m
             else DISCOSNamespace.__message_dict__
         )
 
-        if fmt_spec == "":
-            pass
-        elif fmt_spec == "t":
-            separators = (",", ":")
-        elif fmt_spec.endswith("i"):
-            fmt_par = fmt_spec[:-1]
-            indent = 2
-            if fmt_par:
-                try:
-                    indent = int(fmt_par)
-                except ValueError as exc:
-                    raise ValueError(
-                        f"Invalid indent in format spec: '{fmt_spec[:-1]}'"
-                    ) from exc
-                if indent <= 0:
-                    raise ValueError("Indentation must be a positive integer")
-        else:
-            raise ValueError(
-                f"Unknown format code '{spec}' for {self.__class__.__name__}"
-            )
+        option = orjson.OPT_SORT_KEYS
+        if has_i:
+            option |= orjson.OPT_INDENT_2
 
-        return json.dumps(
+        return orjson.dumps(
             self.__public_dict__(),
             default=default,
-            indent=indent,
-            separators=separators,
-            sort_keys=True,
-            ensure_ascii=False
-        )
+            option=option,
+        ).decode()
 
     def __public_dict__(self) -> dict[str, DISCOSNamespace]:
         """

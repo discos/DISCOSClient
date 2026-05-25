@@ -15,6 +15,7 @@ from discos_client.client import DISCOSClient, \
     SRTClient, MedicinaClient, NotoClient, \
     DEFAULT_SUB_PORT, DEFAULT_REQ_PORT
 from discos_client.namespace import DISCOSNamespace
+from discos_client.initializer import NSInitializer
 
 
 if sys.platform == "win32":
@@ -279,13 +280,7 @@ class TestDISCOSClient(unittest.TestCase):
             _ = f"{client:0i}"
         self.assertEqual(
             str(ex.exception),
-            "Indentation must be a positive integer"
-        )
-        with self.assertRaises(ValueError) as ex:
-            _ = f"{client:ai}"
-        self.assertEqual(
-            str(ex.exception),
-            "Invalid indent in format spec: 'a'"
+            "Unknown format code '0i' for DISCOSClient"
         )
         with self.assertRaises(ValueError) as ex:
             _ = f"{client:3c}"
@@ -294,6 +289,8 @@ class TestDISCOSClient(unittest.TestCase):
             "Unknown format code '3c' for DISCOSClient"
         )
         self.assertNotIn("\": ", f"{client:t}")
+        indented = f"{client:i}"
+        self.assertIn("\n", indented)
 
     def test_bind(self):
         with TestPublisher("SRT"):
@@ -494,6 +491,33 @@ class TestDISCOSClient(unittest.TestCase):
             "Either 'telescope' or 'server_public_key_file' must be provided",
             str(ex.exception)
         )
+
+
+class TestNSInitializer(unittest.TestCase):
+
+    def test_build_ns_tree_non_empty_array(self):
+        init = NSInitializer("SRT")
+        item_schema = {
+            "type": "object",
+            "title": "Item",
+            "required": ["x"],
+            "properties": {
+                "x": {"type": "number", "title": "X"}
+            }
+        }
+        schema = {
+            "type": "array",
+            "title": "Test Array",
+            "items": item_schema
+        }
+        data = [{"x": 1.0}, {"x": 2.0}]
+        wrapper = {"arr": data}
+        ns = init._build_ns_tree(wrapper, "arr", schema, True)
+        self.assertIsInstance(ns, DISCOSNamespace)
+        self.assertIn(0, ns._children)
+        self.assertIn(1, ns._children)
+        self.assertEqual(ns._children[0].x, 1.0)
+        self.assertEqual(ns._children[1].x, 2.0)
 
 
 class TestTelescopeClients(unittest.TestCase):

@@ -1,10 +1,10 @@
 from __future__ import annotations
 import re
-import json
 from pathlib import Path
 from typing import Any
 from importlib.resources import files
 from collections.abc import Iterable
+import orjson
 from .utils import META_KEYS
 from .namespace import DISCOSNamespace
 
@@ -22,8 +22,10 @@ class NSInitializer:
     builds a mapping between logical topic names and absolute schema IDs.
 
     It finally provides :meth:`initialize`, which constructs the initial
-    `DISCOSNamespace` tree for a topic, enriched with schema metadata
-    and with all required/initialized fields present.
+    :class:`~discos_client.namespace.DISCOSNamespace` tree for a topic.
+    The tree is a **stable view** over a shared plain-dict data store:
+    each namespace node holds a reference to its parent container and key
+    rather than owning its value directly.
     """
 
     def __init__(self, telescope: str | None = None):
@@ -40,7 +42,7 @@ class NSInitializer:
         """
         base_dir = files("discos_client") / "schemas"
         self._pp_cache: \
-            dict[int, list[tuple[str, "re.Pattern", str, dict]]] = {}
+            dict[int, list[tuple[str, "re.Pattern | None", dict]]] = {}
         self.schemas, definitions, self.node_to_id = \
             self._load_schemas(base_dir, telescope)
 
@@ -68,30 +70,32 @@ class NSInitializer:
         reactive: bool = True,
     ) -> DISCOSNamespace:
         """
-        Build the initial :class:`DISCOSNamespace` for the given topic.
+        Build the initial :class:`~discos_client.namespace.DISCOSNamespace`
+        tree for the given topic.
 
-        The namespace contains:
-        * All required fields from the schema.
-        * All fields listed in the schema's ``initialize`` array.
-        * Metadata fields copied from the schema.
-        * Proper structure for objects, arrays and primitives.
+        The tree is a **stable view** over a freshly allocated plain-dict
+        data store.  The dict is populated with ``None`` for all primitive
+        leaves and empty dicts/lists for object/array nodes, covering every
+        field declared as ``required`` or ``initialize`` in the schema.
+
+        The namespace tree mirrors this dict structure: each node holds a
+        reference to its *parent container* and its *key* rather than
+        embedding the value.  Serialisation and updates both operate on the
+        plain dict, keeping DISCOSNamespace out of the hot path.
 
         :param topic: Logical topic name (schema ``node`` value).
-        :return: A fully initialized namespace tree ready to receive updates.
+        :param reactive: Whether to attach ``bind`` / ``unbind`` / ``wait``
+                         to the namespace nodes.
+        :return: A fully initialised namespace tree ready to receive updates.
         :raises ValueError: If the topic does not correspond to a loaded
                             schema.
         """
         if topic not in self.node_to_id:  # pragma: no cover
             raise ValueError(f"Schema '{topic}' was not loaded.")
-        node_id = self.node_to_id[topic]
-        schema = self.schemas[node_id]
-        payload = self._initialize_from_schema(schema)
-        return DISCOSNamespace(
-            schema=schema,
-            node_name=topic,
-            reactive=reactive,
-            **payload
-        )
+        schema = self.schemas[self.node_to_id[topic]]
+        data = self._build_data_dict(schema)
+        wrapper: dict[str, Any] = {topic: data}
+        return self._build_ns_tree(wrapper, topic, schema, reactive)
 
     def get_topics(self) -> list[str]:
         """
@@ -101,28 +105,203 @@ class NSInitializer:
         """
         return self.available_topics
 
-    def _literal_prefix(self, pat: str) -> str:
+    def _build_data_dict(self, schema: dict[str, Any]) -> dict[str, Any]:
         """
-        Extract the literal prefix of a regex pattern.
+        Build an initial **plain** data dict from *schema*.
 
-        The prefix consists of non-metacharacter characters up to the first
-        special symbol and is used to optimize ``patternProperties`` matching.
+        Only structural types are represented — no schema metadata is
+        embedded.  Required and ``initialize`` fields are included;
+        optional fields absent from ``initialize`` are omitted.
 
-        :param pat: Regular expression pattern.
-        :return: Literal prefix extracted from the pattern.
+        :param schema: Fully resolved and merged JSON Schema object.
+        :return: Plain dict with ``None`` for primitives, ``{}`` for objects,
+                 ``[]`` for arrays.
         """
-        i = 0
-        if pat.startswith('^'):
-            i = 1
-        out = []
-        meta = set('.^$*+?[]{}()|\\')
-        while i < len(pat):
-            c = pat[i]
-            if c in meta:
-                break
-            out.append(c)  # pragma: no cover
-            i += 1  # pragma: no cover
-        return ''.join(out)
+        result: dict[str, Any] = {}
+        required, initialize = self._collect_init_keys(schema)
+        for key in required | initialize:
+            prop_schema = self._find_property_schema(schema, key)
+            if prop_schema is None:  # pragma: no cover
+                continue
+            result[key] = self._initial_value_for(prop_schema)
+        return result
+
+    def _initial_value_for(self, schema: dict[str, Any]) -> Any:
+        """
+        Return the appropriate initial value for a single property.
+
+        :param schema: Property schema.
+        :return: ``{}`` for objects, ``[]`` for arrays, ``None`` for
+                 primitives.
+        """
+        t = schema.get("type")
+        if t == "object":
+            return self._build_data_dict(schema)
+        if t == "array":
+            return []
+        return None
+
+    def _build_ns_tree(
+        self,
+        parent_container: dict | list,
+        key: str | int,
+        schema: dict[str, Any],
+        reactive: bool,
+    ) -> DISCOSNamespace:
+        """
+        Recursively build a :class:`~discos_client.namespace.DISCOSNamespace`
+        tree rooted at ``parent_container[key]``.
+
+        The namespace node receives:
+
+        * Schema metadata (``title``, ``description``, ``unit``, ``enum``,
+          ``format``, ``type``) stored in ``_schema_meta``.
+        * Pre-compiled ``patternProperties`` patterns stored in
+          ``_pattern_schemas`` so that dynamically keyed children (e.g.
+          individual backend or derotator instances) can be created on first
+          arrival without a reference back to this initializer.
+        * Pre-built child namespaces for every key present in the initial
+          data dict (objects) or every index present in the initial list
+          (arrays).
+
+        :param parent_container: The dict or list containing the node to wrap.
+        :param key: Key / index of the node inside *parent_container*.
+        :param schema: JSON Schema for this node.
+        :param reactive: Whether to attach reactive helpers to nodes.
+        :return: Root of the constructed namespace sub-tree.
+        """
+        schema_meta = {k: schema[k] for k in META_KEYS if k in schema}
+        ns = DISCOSNamespace(parent_container, key, schema_meta, reactive)
+        node = parent_container[key]
+        if isinstance(node, dict):
+            self._attach_pattern_schemas(ns, schema)
+            properties = schema.get("properties", {})
+            required, initialize = self._collect_init_keys(schema)
+            keys_to_build = (required | initialize) & set(node.keys())
+            for k in keys_to_build:
+                prop_schema = (
+                    properties.get(k)
+                    or self._find_property_schema(schema, k)
+                    or {}
+                )
+                child_ns = self._build_ns_tree(node, k, prop_schema, reactive)
+                ns._children[k] = child_ns
+        elif isinstance(node, list):
+            item_schema = schema.get("items") or {}
+            item_full_meta = self._build_meta_from_schema(item_schema)
+            object.__setattr__(ns, '_item_full_meta', item_full_meta)
+            for i, _ in enumerate(node):
+                child_ns = self._build_ns_tree(node, i, item_schema, reactive)
+                ns._children[i] = child_ns
+        return ns
+
+    def _attach_pattern_schemas(
+        self,
+        ns: DISCOSNamespace,
+        schema: dict[str, Any],
+    ) -> None:
+        """
+        Populate ``_pattern_schemas`` on *ns* from the schema's
+        ``patternProperties``, using the precompiled cache built during
+        :meth:`__init__`.
+
+        ``patternProperties`` is searched at two levels:
+
+        * The top-level schema (e.g. active surface sector nodes).
+        * Each branch of an ``anyOf`` block.  Schemas like ``backends``,
+          ``receivers`` and ``derotators`` use ``anyOf`` with one fixed branch
+          and one ``patternProperties`` branch for dynamically named instances
+          (``SARDARA``, ``CCB``, etc.).  Without this second pass those topics
+          would never get dynamic child namespaces created on first message
+          arrival.
+
+        This allows
+        :meth:`~discos_client.namespace.DISCOSNamespace._merge_dict`
+        to create namespace children for dynamic keys without holding a
+        reference back to this initializer.
+
+        :param ns: The namespace node to enrich.
+        :param schema: The schema for that node, potentially containing
+                       ``patternProperties`` at the top level or inside
+                       ``anyOf`` branches.
+        """
+        pp_dicts = []
+        top_pp = schema.get("patternProperties")
+        if top_pp:
+            pp_dicts.append(top_pp)
+        for alt in schema.get("anyOf", []):
+            if isinstance(alt, dict):
+                alt_pp = alt.get("patternProperties")
+                if alt_pp:
+                    pp_dicts.append(alt_pp)
+
+        if not pp_dicts:
+            return
+
+        pattern_schemas = []
+        for pp in pp_dicts:
+            pp_list = self._pp_cache.get(id(pp), [])
+            for _, rx, pschema in pp_list:
+                if rx is not None:
+                    full_meta = self._build_meta_from_schema(pschema)
+                    pattern_schemas.append((rx, full_meta))
+
+        if pattern_schemas:
+            object.__setattr__(ns, '_pattern_schemas', pattern_schemas)
+
+    def _collect_init_keys(
+        self,
+        schema: dict[str, Any]
+    ) -> tuple[set[str], set[str]]:
+        """
+        Recursively collect all ``required`` and ``initialize`` fields declared
+        in a schema, including those defined inside ``anyOf`` branches.
+
+        :param schema: A JSON Schema object, potentially containing ``anyOf``
+                       branches and local ``required`` / ``initialize``
+                       sections.
+        :return: A tuple where each element is a set of field names
+                 aggregated from the entire schema hierarchy.
+        """
+        required: set[str] = set(schema.get("required", []))
+        initialize: set[str] = set(schema.get("initialize", []))
+
+        any_of = schema.get("anyOf")
+        if isinstance(any_of, list):
+            for alt in any_of:
+                if isinstance(alt, dict):
+                    r_alt, i_alt = self._collect_init_keys(alt)
+                    required |= r_alt
+                    initialize |= i_alt
+
+        return required, initialize
+
+    def _find_property_schema(
+        self,
+        schema: dict[str, Any],
+        key: str
+    ) -> dict[str, Any] | None:
+        """
+        Locate the schema of a named property within a schema.
+
+        The property is first searched in the top-level ``properties``
+        dictionary, then inside any ``anyOf`` alternatives.
+
+        :param schema: Schema object in which to search.
+        :param key: Name of the property to look for.
+        :return: The matching property schema, or ``None`` if not found.
+        """
+        props = schema.get("properties", {})
+        if key in props:
+            return props[key]
+        any_of = schema.get("anyOf")
+        if isinstance(any_of, list):
+            for alt in any_of:
+                if isinstance(alt, dict):
+                    found = self._find_property_schema(alt, key)
+                    if found is not None:
+                        return found
+        return None  # pragma: no cover
 
     def _precompile_patternprops(self, obj: dict | list) -> None:
         """
@@ -166,29 +345,26 @@ class NSInitializer:
     def _build_pp_list(
         self,
         pp: dict
-    ) -> list[tuple[str, re.Pattern | None, str, dict]]:
+    ) -> list[tuple[str, re.Pattern | None, dict]]:
         """
-        Converts a ``patternProperties`` dictionary into a list of compiled
+        Convert a ``patternProperties`` dictionary into a list of compiled
         entries.
 
         Each entry contains:
-        * the raw pattern
-        * the compiled regex (or ``None`` if invalid)
-        * the literal prefix
+        * the raw pattern string
+        * the compiled regex (or ``None`` if compilation fails)
         * the associated property schema
 
         :param pp: Dictionary of raw patternProperties.
-
         :return: Precompiled patternProperties entries.
         """
-        compiled: list[tuple[str, re.Pattern | None, str, dict]] = []
+        compiled: list[tuple[str, re.Pattern | None, dict]] = []
         for pat, pschema in pp.items():
             try:
                 rx = re.compile(pat)
             except re.error:  # pragma: no cover
                 rx = None
-            pref = self._literal_prefix(pat)
-            compiled.append((pat, rx, pref, pschema))
+            compiled.append((pat, rx, pschema))
         return compiled
 
     def _load_schemas(
@@ -209,9 +385,7 @@ class NSInitializer:
 
         :param base_dir: Base directory containing the schema tree.
         :param telescope: Optional telescope name.
-
         :return: A tuple ``(schemas, definitions, node_to_id)``.
-
         :raises FileNotFoundError: If the definitions directory is missing.
         :raises ValueError: If a schema is missing its ``node`` field.
         """
@@ -227,7 +401,7 @@ class NSInitializer:
         for f in definitions_dir.iterdir():
             if f.is_file() and f.name.endswith(".json"):
                 rel_path = f.resolve().relative_to(base_dir).as_posix()
-                schema = json.loads(f.read_text(encoding="utf-8"))
+                schema = orjson.loads(f.read_text(encoding="utf-8"))
                 self._absolutize_refs(schema, base_dir, rel_path)
                 schema_id = schema.get("$id", rel_path)
                 definitions[schema_id] = schema
@@ -236,7 +410,7 @@ class NSInitializer:
                 if f.is_file() and f.name.endswith(".json"):
                     rel_path = \
                         f.resolve().relative_to(base_dir).as_posix()
-                    schema = json.loads(f.read_text(encoding="utf-8"))
+                    schema = orjson.loads(f.read_text(encoding="utf-8"))
                     self._absolutize_refs(schema, base_dir, rel_path)
                     schema_id = schema.get("$id", rel_path)
                     node_name = schema.get("node")
@@ -256,9 +430,6 @@ class NSInitializer:
     ) -> dict[str, Any]:
         """
         Rewrite all ``$ref`` values in a schema to canonical absolute paths.
-
-        Relative references are normalized with respect to the current
-        file and base directory so they can be resolved consistently.
 
         :param schema: Schema whose references will be rewritten in-place.
         :param base_dir: Base directory containing the schema tree.
@@ -291,12 +462,6 @@ class NSInitializer:
         """
         Normalize a single ``$ref`` value into an absolute, canonical form.
 
-        This handles:
-        * Pure fragment references (starting with ``#``).
-        * Relative paths (including ``..`` segments) resolved against
-          the current file and base directory.
-        * Optional fragments appended to the resolved path.
-
         :param ref: Raw reference string as found in the schema.
         :param base_dir: Base directory containing all schemas.
         :param current_file: Path of the file that owns the reference.
@@ -326,8 +491,6 @@ class NSInitializer:
         """
         Recursively resolve all ``$ref`` occurrences inside a schema.
 
-        Referenced definitions are merged with inline overrides.
-
         :param schema: Schema containing references.
         :param definitions: Mapping of absolute definition identifiers to their
                             content.
@@ -356,9 +519,6 @@ class NSInitializer:
         """
         Recursively merge all ``allOf`` blocks in the schema.
 
-        ``properties`` and ``patternProperties`` are combined,
-        ``required`` fields are unioned, and ``initialize`` arrays are merged.
-
         :param schema: Schema object containing ``allOf`` blocks.
         :return: Schema with all ``allOf`` sections flattened.
         """
@@ -379,14 +539,6 @@ class NSInitializer:
     ) -> dict[str, Any]:
         """
         Merge multiple subschemas into a single schema object.
-
-        This helper is used to flatten ``allOf`` blocks. It:
-
-        * Merges ``properties`` and ``patternProperties``.
-        * Unions all ``required`` fields.
-        * Unions all ``initialize`` fields.
-        * Copies any other keys, letting later subschemas override
-          earlier ones.
 
         :param subschemas: List of schema fragments to merge.
         :return: A single schema representing the merged subschemas.
@@ -419,255 +571,15 @@ class NSInitializer:
             merged["initialize"] = list(sorted(initialize_fields))
         return merged
 
-    def _replace_patterns_with_properties(
-        self,
-        schema: dict[str, Any],
-        message: dict[str, Any]
-    ) -> dict[str, Any]:
-        """
-        Optionally strip ``patternProperties`` from a schema.
-
-        If no message data is available, any ``patternProperties`` section
-        is removed from the returned schema copy. Otherwise the schema
-        is left unchanged.
-
-        :param schema: Schema object that may contain ``patternProperties``.
-        :param message: Message payload used to decide whether patterns should
-                        be retained or removed.
-        :return: The original schema or a shallow copy without
-                 ``patternProperties``.
-        """
-        pp = schema.get("patternProperties")
-        if not pp or not message:
-            if "patternProperties" in schema:
-                out = dict(schema)
-                out.pop("patternProperties", None)
-                return out
-        return schema
-
-    def _enrich_properties(
-        self,
-        schema: dict[str, Any],
-        values: dict[str, Any],
-    ) -> dict[str, Any]:
-        """
-        Enrich all relevant properties for an object schema.
-
-        Only properties that are required or present in ``values`` are
-        processed. Each selected property is converted into its enriched
-        representation, including metadata and nested structures.
-
-        :param schema: Object schema definition.
-        :param values: Current values for the object, used to decide which
-                       properties to include and how to initialize them.
-        :return: A dictionary mapping property names to enriched values.
-        """
-        schema = self._replace_patterns_with_properties(schema, values)
-        properties = schema.get("properties", {})
-        required = set(schema.get("required", []))
-        initialize = set(schema.get("initialize", []))
-        result: dict[str, Any] = {}
-        for key, prop_schema in properties.items():
-            if key in required.union(initialize) or key in values:
-                prop_schema = self._replace_patterns_with_properties(
-                    prop_schema,
-                    values.get(key, {})
-                )
-                result[key] = self._enrich_named_property(
-                    key, prop_schema, values
-                )
+    def _build_meta_from_schema(self, schema: dict) -> dict:
+        result = {k: schema[k] for k in META_KEYS if k in schema}
+        for key, prop_schema in schema.get("properties", {}).items():
+            child_meta = self._build_meta_from_schema(prop_schema)
+            if child_meta:
+                result[key] = child_meta
+        items_schema = schema.get("items")
+        if isinstance(items_schema, dict):
+            item_meta = self._build_meta_from_schema(items_schema)
+            if item_meta:
+                result["items"] = [item_meta]
         return result
-
-    def _meta(self, d: dict[str, Any]) -> dict[str, Any]:
-        """
-        Extract metadata keys from a schema dictionary.
-
-        Only keys listed in :data:`META_KEYS` are preserved.
-
-        :param d: Source dictionary, typically a schema fragment.
-        :return: Dictionary containing only the metadata entries.
-        """
-        return {
-            k: d[k]
-            for k in META_KEYS
-            if k in d
-        }
-
-    def _without(self, d: dict[str, Any], *keys: str) -> dict[str, Any]:
-        """
-        Return a shallow copy of a dictionary without the given keys.
-
-        :param d: Original dictionary.
-        :param keys: Keys to exclude from the result.
-        :return: New dictionary without the specified keys.
-        """
-        return {
-            k: v
-            for k, v in d.items()
-            if k not in keys
-        }
-
-    def _enrich_object(
-        self,
-        obj_schema: dict[str, Any],
-        obj_value: Any
-    ) -> dict[str, Any]:
-        """
-        Enrich an object-typed property according to its schema.
-
-        Nested properties are enriched recursively and combined with the
-        metadata extracted from the object schema itself.
-
-        :param obj_schema: Schema definition for the object.
-        :param obj_value: Current value for the object, expected to be a
-                          dictionary or ``None``.
-        :return: Enriched object containing metadata and nested fields.
-        """
-        nested_values = obj_value if isinstance(obj_value, dict) else {}
-        nested = self._enrich_properties(obj_schema, nested_values)
-        meta = self._meta(obj_schema)
-        if nested:
-            meta.update(nested)
-        return meta
-
-    def _enrich_array(
-        self,
-        arr_schema: dict[str, Any],
-        arr_value: Any
-    ) -> dict[str, Any]:
-        """
-        Enrich an array-typed property according to its schema.
-
-        When no structured value is provided, the method returns a
-        metadata dictionary with an empty ``value`` list and without
-        the ``items`` key from the schema.
-
-        :param arr_schema: Schema definition for the array.
-        :param arr_value: Current value for the array.
-        :return: Enriched array representation or an empty dictionary.
-        """
-        out = {}
-        if not isinstance(arr_value, dict):
-            out = self._without(arr_schema, "items")
-            out["value"] = []
-        return out
-
-    def _enrich_named_property(
-        self,
-        key: str,
-        schema: dict[str, Any],
-        values: dict[str, Any]
-    ) -> dict[str, Any]:
-        """
-        Enrich a single named property according to its type.
-
-        Objects and arrays are delegated to their specific helpers,
-        while primitive types are wrapped with metadata and a
-        ``value`` field.
-
-        :param key: Property name.
-        :param schema: Schema definition for the property.
-        :param values: Dictionary containing current values for the parent
-                       object.
-        :return: Enriched representation for the property.
-        """
-        value = values.get(key, None)
-        t = schema.get("type")
-
-        if t == "object":
-            return self._enrich_object(schema, value)
-        if t == "array":
-            return self._enrich_array(schema, value)
-        out = self._meta(schema)
-        out["value"] = value
-        return out
-
-    def _collect_init_keys(
-        self,
-        schema: dict[str, Any]
-    ) -> tuple[set[str], set[str]]:
-        """
-        Recursively collect all ``required`` and ``initialize`` fields declared
-        in a schema, including those defined inside ``anyOf`` branches.
-
-        :param schema: A JSON Schema object, potentially containing ``anyOf``
-                       branches and local ``required`` / ``initialize``
-                       sections.
-        :return: A tuple where each element is a set of field names
-                 aggregated from the entire schema hierarchy.
-        """
-        required: set[str] = set(schema.get("required", []))
-        initialize: set[str] = set(schema.get("initialize", []))
-
-        any_of = schema.get("anyOf")
-        if isinstance(any_of, list):
-            for alt in any_of:
-                if isinstance(alt, dict):
-                    r_alt, i_alt = self._collect_init_keys(alt)
-                    required |= r_alt
-                    initialize |= i_alt
-
-        return required, initialize
-
-    def _initialize_from_schema(
-        self,
-        schema: dict[str, Any]
-    ) -> dict[str, Any]:
-        """
-        Build the initial payload from a schema.
-
-        Includes:
-        * All fields required by the schema.
-        * All fields listed under ``initialize``.
-        * Metadata fields defined in the schema.
-        * Correctly initialized structures for objects, arrays and leaf nodes.
-
-        :param schema: Fully normalized JSON schema.
-        :return: Initial structured payload used to construct a namespace.
-        """
-        required, initialize = self._collect_init_keys(schema)
-        result: dict[str, Any] = {}
-
-        for key in required.union(initialize):
-            prop_schema = self._find_property_schema(schema, key)
-            if prop_schema is None:  # pragma: no cover
-                continue
-            prop_schema = self._replace_patterns_with_properties(
-                prop_schema,
-                {}
-            )
-            result[key] = self._enrich_named_property(
-                key,
-                prop_schema,
-                {}
-            )
-        meta = self._meta(schema)
-        meta.update(result)
-        return meta
-
-    def _find_property_schema(
-        self,
-        schema: dict[str, Any],
-        key: str
-    ) -> dict[str, Any] | None:
-        """
-        Locate the schema of a named property within a schema.
-
-        The property is first searched in the top-level ``properties``
-        dictionary, then inside any ``anyOf`` alternatives.
-
-        :param schema: Schema object in which to search.
-        :param key: Name of the property to look for.
-        :return: The matching property schema, or ``None`` if not found.
-        """
-        props = schema.get("properties", {})
-        if key in props:
-            return props[key]
-        any_of = schema.get("anyOf")
-        if isinstance(any_of, list):
-            for alt in any_of:
-                if isinstance(alt, dict):
-                    found = self._find_property_schema(alt, key)
-                    if found is not None:
-                        return found
-        return None  # pragma: no cover

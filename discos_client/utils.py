@@ -16,7 +16,6 @@ __all__ = [
     "rand_id",
     "delegated_operations",
     "delegated_comparisons",
-    "public_dict",
     "get_auth_keys",
     "timestamp"
 ]
@@ -104,60 +103,6 @@ def delegated_comparisons(handler: str) -> Callable[[type], type]:
             setattr(cls, method_name, method)
         return cls
     return decorator
-
-
-def public_dict(
-    obj: Any,
-    is_fn: Callable,
-    get_value_fn: Callable
-) -> Any:
-    """
-    Returns a copy of the dictionary containing only the public attributes of
-    the given object.
-
-    :param obj: The object which a public dictionary will be returned.
-    :param is_fn: A function that checks if the given object is instance of a
-                  given type.
-    :param get_value_fn: A function that returns the inner value of the object.
-    :return: The dictionary containing only the public values of the object.
-    """
-    d = {}
-    for k, v in vars(obj).items():
-        if callable(v):
-            # We don't need to include methods
-            continue
-        if k == "_value":
-            if isinstance(v, (list, tuple)):
-                d["items"] = __unwrap(v, is_fn, get_value_fn)
-            else:
-                d["value"] = v
-        elif not k.startswith("_"):
-            if k == "enum" and is_fn(v):
-                d[k] = __unwrap(v, is_fn, get_value_fn)
-            else:
-                d[k] = public_dict(
-                    v,
-                    is_fn,
-                    get_value_fn
-                ) if is_fn(v) else v
-    return d
-
-
-def __unwrap(value: Any, is_fn, get_value_fn) -> Any:
-    """
-    Returns the inner value of a given object, either in its original form or
-    as a list.
-
-    :param value: The object whose internal value will be returned.
-    :param is_fn: A function that checks if the given object is instance of a
-                  given type.
-    :param get_value_fn: A function that returns the inner value of the object.
-    :return: The internal value if present, either as its original type or as a
-             list, or value itself.
-    """
-    while is_fn(value):
-        value = get_value_fn(value)
-    return list(value) if isinstance(value, (list, tuple)) else value
 
 
 def get_client_auth_keys(identity: str) -> tuple[bytes, bytes]:
