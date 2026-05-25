@@ -4,6 +4,7 @@ import time
 import re
 import asyncio
 import sys
+import zlib
 from unittest.mock import patch
 from pathlib import Path
 from threading import Thread, Event
@@ -14,6 +15,7 @@ from discos_client.client import DISCOSClient, \
     SRTClient, MedicinaClient, NotoClient, \
     DEFAULT_SUB_PORT, DEFAULT_REQ_PORT
 from discos_client.namespace import DISCOSNamespace
+from discos_client.initializer import NSInitializer
 
 
 if sys.platform == "win32":
@@ -107,10 +109,10 @@ class TestPublisher:
             if op == 1 and re.match(r"^[0-9A-Za-z]{4}_.+$", topic):
                 t = topic.split("_", 1)[1]
                 if t in self.messages:
-                    message = json.dumps(
+                    message = zlib.compress(json.dumps(
                         self.messages[t],
                         separators=(",", ":")
-                    ).encode("utf-8")
+                    ).encode("utf-8"))
                     self.pub.send_multipart([
                         topic.encode("ascii"),
                         message
@@ -122,10 +124,10 @@ class TestPublisher:
                             subkey = key[len(t) + 1:]
                             subparts[subkey] = val
                     if subparts:
-                        message = json.dumps(
+                        message = zlib.compress(json.dumps(
                             subparts,
                             separators=(",", ":")
-                        ).encode("utf-8")
+                        ).encode("utf-8"))
                         self.pub.send_multipart([
                             topic.encode("ascii"), message
                         ])
@@ -156,10 +158,10 @@ class TestPublisher:
             if "." in topic:
                 topic, obj = topic.split(".", 1)
                 payload = {obj: payload}
-            payload = json.dumps(
+            payload = zlib.compress(json.dumps(
                 payload,
                 separators=(",", ":")
-            ).encode("utf-8")
+            ).encode("utf-8"))
             self.pub.send_multipart([
                 topic.encode("ascii"),
                 payload
@@ -278,13 +280,7 @@ class TestDISCOSClient(unittest.TestCase):
             _ = f"{client:0i}"
         self.assertEqual(
             str(ex.exception),
-            "Indentation must be a positive integer"
-        )
-        with self.assertRaises(ValueError) as ex:
-            _ = f"{client:ai}"
-        self.assertEqual(
-            str(ex.exception),
-            "Invalid indent in format spec: 'a'"
+            "Unknown format code '0i' for DISCOSClient"
         )
         with self.assertRaises(ValueError) as ex:
             _ = f"{client:3c}"
@@ -293,6 +289,8 @@ class TestDISCOSClient(unittest.TestCase):
             "Unknown format code '3c' for DISCOSClient"
         )
         self.assertNotIn("\": ", f"{client:t}")
+        indented = f"{client:i}"
+        self.assertIn("\n", indented)
 
     def test_bind(self):
         with TestPublisher("SRT"):
@@ -493,6 +491,33 @@ class TestDISCOSClient(unittest.TestCase):
             "Either 'telescope' or 'server_public_key_file' must be provided",
             str(ex.exception)
         )
+
+
+class TestNSInitializer(unittest.TestCase):
+
+    def test_build_ns_tree_non_empty_array(self):
+        init = NSInitializer("SRT")
+        item_schema = {
+            "type": "object",
+            "title": "Item",
+            "required": ["x"],
+            "properties": {
+                "x": {"type": "number", "title": "X"}
+            }
+        }
+        schema = {
+            "type": "array",
+            "title": "Test Array",
+            "items": item_schema
+        }
+        data = [{"x": 1.0}, {"x": 2.0}]
+        wrapper = {"arr": data}
+        ns = init._build_ns_tree(wrapper, "arr", schema, True)
+        self.assertIsInstance(ns, DISCOSNamespace)
+        self.assertIn(0, ns._children)
+        self.assertIn(1, ns._children)
+        self.assertEqual(ns._children[0].x, 1.0)
+        self.assertEqual(ns._children[1].x, 2.0)
 
 
 class TestTelescopeClients(unittest.TestCase):

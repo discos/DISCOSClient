@@ -173,6 +173,9 @@
           "title": "Current Setup",
           "description": "Currently selected backend's setup code."
         },
+        "status": {
+          "$ref": "../definitions/status.json"
+        },
         "timestamp": {
           "$ref": "../definitions/timestamp.json"
         }
@@ -181,6 +184,7 @@
         "availableBackends",
         "currentBackend",
         "currentSetup",
+        "status",
         "timestamp"
       ]
     },

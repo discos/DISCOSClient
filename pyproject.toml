@@ -16,7 +16,8 @@ classifiers = [
 ]
 dependencies = [
     "pyzmq",
-    "platformdirs"
+    "platformdirs",
+    "orjson"
 ]
 
 [tool.setuptools]
